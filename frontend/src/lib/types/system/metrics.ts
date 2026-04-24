@@ -39,12 +39,23 @@ export interface Metrics {
   prompt_tokens_total?: number;
   running_requests?: number;
   pending_requests?: number;
+  // VRAM (aggregated across GPUs)
+  vram_used_gb?: number;
+  vram_capacity_gb?: number;
+  power_limit_watts?: number;
   // Session averages (since first token this session)
   session_avg_prefill?: number;
   session_avg_generation?: number;
-  // Session peaks (best this session)
+  // Session peaks (best this session) — reset on model switch
   session_peak_prefill?: number;
   session_peak_generation?: number;
+  session_peak_prompt_throughput?: number;
+  session_peak_generation_throughput?: number;
+  session_peak_ttft_ms?: number;
+  session_peak_kv_cache_usage?: number;
+  session_peak_running_requests?: number;
+  session_peak_power_watts?: number;
+  session_peak_vram_used_gb?: number;
   // All-time peak metrics (stored best values)
   peak_prefill_tps?: number;
   peak_generation_tps?: number;

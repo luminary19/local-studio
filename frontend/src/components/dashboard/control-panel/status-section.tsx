@@ -37,17 +37,39 @@ export function StatusSection({
   const isRunning = !!currentProcess;
   const backend = currentProcess?.backend;
 
-  const totalPower = gpus.reduce((sum, g) => sum + (g.power_draw || 0), 0);
-  const totalMemUsed = gpus.reduce((sum, g) => {
+  const fallbackTotalPower = gpus.reduce((sum, g) => sum + (g.power_draw || 0), 0);
+  const fallbackTotalMemUsed = gpus.reduce((sum, g) => {
     if (g.memory_used_mb != null) return sum + toGBFromMB(g.memory_used_mb);
     return sum + toGB(g.memory_used ?? 0);
   }, 0);
+  const fallbackMemCapacity = gpus.reduce((sum, g) => {
+    if (g.memory_total_mb != null) return sum + toGBFromMB(g.memory_total_mb);
+    return sum + toGB(g.memory_total ?? 0);
+  }, 0);
+  const fallbackPowerLimit = gpus.reduce((sum, g) => sum + (g.power_limit || 0), 0);
+
+  const totalPower = metrics?.current_power_watts ?? fallbackTotalPower;
+  const totalMemUsed = metrics?.vram_used_gb ?? fallbackTotalMemUsed;
+  const vramCapacity = metrics?.vram_capacity_gb ?? fallbackMemCapacity;
+  const powerLimit = metrics?.power_limit_watts ?? fallbackPowerLimit;
+
   const sessionInput = metrics?.prompt_tokens_total || 0;
   const sessionOutput = metrics?.generation_tokens_total || 0;
-  const kvCache = metrics?.kv_cache_usage ? Math.round(metrics.kv_cache_usage * 100) : null;
+  const kvCache = metrics?.kv_cache_usage ? metrics.kv_cache_usage * 100 : null;
+  const kvCachePeak = metrics?.session_peak_kv_cache_usage
+    ? metrics.session_peak_kv_cache_usage * 100
+    : null;
 
   const genTps = firstPositive(metrics?.session_avg_generation, metrics?.generation_throughput);
   const prefillTps = firstPositive(metrics?.session_avg_prefill, metrics?.prompt_throughput);
+  const genPeak = firstPositive(metrics?.session_peak_generation_throughput);
+  const prefillPeak = firstPositive(metrics?.session_peak_prompt_throughput);
+  const ttftMs = firstPositive(metrics?.avg_ttft_ms);
+  const ttftPeak = firstPositive(metrics?.session_peak_ttft_ms);
+  const sessions = metrics?.running_requests ?? 0;
+  const sessionsPeak = metrics?.session_peak_running_requests ?? 0;
+  const powerPeak = firstPositive(metrics?.session_peak_power_watts);
+  const vramPeak = firstPositive(metrics?.session_peak_vram_used_gb);
 
   return (
     <SectionCard label="Status" icon="monitor">
@@ -91,13 +113,53 @@ export function StatusSection({
       {/* Stat pills */}
       {isRunning && (
         <div className="flex flex-wrap gap-3 mt-5 pt-5 border-t border-(--border)/40">
-          {genTps > 0 && <StatPill label="Generation" value={`${genTps.toFixed(1)}`} unit="tok/s" highlight />}
-          {prefillTps > 0 && <StatPill label="Prefill" value={`${prefillTps.toFixed(1)}`} unit="tok/s" />}
+          <StatPill
+            label="Decode"
+            value={genTps.toFixed(1)}
+            unit="tok/s"
+            peak={genPeak > 0 ? `${genPeak.toFixed(1)} max` : undefined}
+            highlight
+          />
+          <StatPill
+            label="Prefill"
+            value={prefillTps.toFixed(1)}
+            unit="tok/s"
+            peak={prefillPeak > 0 ? `${prefillPeak.toFixed(1)} max` : undefined}
+          />
+          <StatPill
+            label="TTFT"
+            value={ttftMs > 0 ? ttftMs.toFixed(0) : "—"}
+            unit="ms"
+            peak={ttftPeak > 0 ? `${ttftPeak.toFixed(0)} max` : undefined}
+          />
+          <StatPill
+            label="Sessions"
+            value={String(sessions)}
+            unit=""
+            peak={sessionsPeak > 0 ? `${sessionsPeak} max` : undefined}
+          />
+          {kvCache != null && (
+            <StatPill
+              label="KV Cache"
+              value={kvCache.toFixed(1)}
+              unit="%"
+              peak={kvCachePeak != null ? `${kvCachePeak.toFixed(1)} max` : undefined}
+            />
+          )}
+          <StatPill
+            label="VRAM"
+            value={totalMemUsed.toFixed(1)}
+            unit={vramCapacity > 0 ? `/ ${vramCapacity.toFixed(0)} GB` : "GB"}
+            peak={vramPeak > 0 ? `${vramPeak.toFixed(1)} max` : undefined}
+          />
+          <StatPill
+            label="Power"
+            value={String(Math.round(totalPower))}
+            unit={powerLimit > 0 ? `/ ${Math.round(powerLimit)} W` : "W"}
+            peak={powerPeak > 0 ? `${Math.round(powerPeak)} max` : undefined}
+          />
           {sessionInput > 0 && <StatPill label="Prompt" value={fmt(sessionInput)} unit="tokens" />}
           {sessionOutput > 0 && <StatPill label="Output" value={fmt(sessionOutput)} unit="tokens" />}
-          {kvCache != null && <StatPill label="KV Cache" value={`${kvCache}`} unit="%" />}
-          {totalMemUsed > 0 && <StatPill label="VRAM" value={`${totalMemUsed.toFixed(1)}`} unit="GB" />}
-          {totalPower > 0 && <StatPill label="Power" value={`${Math.round(totalPower)}`} unit="W" />}
         </div>
       )}
     </SectionCard>
@@ -177,11 +239,13 @@ function StatPill({
   label,
   value,
   unit,
+  peak,
   highlight,
 }: {
   label: string;
   value: string;
   unit: string;
+  peak?: string;
   highlight?: boolean;
 }) {
   return (
@@ -190,7 +254,8 @@ function StatPill({
       <span className={`text-sm font-mono tabular-nums ${highlight ? "text-(--fg)" : "text-(--fg)"}`}>
         {value}
       </span>
-      <span className="text-[10px] text-(--dim)">{unit}</span>
+      {unit && <span className="text-[10px] text-(--dim)">{unit}</span>}
+      {peak && <span className="text-[10px] text-(--dim)/70 font-mono tabular-nums">· {peak}</span>}
     </div>
   );
 }
