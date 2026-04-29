@@ -10,10 +10,8 @@ import {
   FileText,
   FolderOpen,
   GitBranch,
-  Hammer,
   Home,
   Loader2,
-  Lock,
   MessageSquare,
   PanelRight,
   Plus,
@@ -439,9 +437,6 @@ export function AgentWorkspace() {
             </div>
           </div>
 
-          <button className="agent-toolbar-button" type="button" title="Runtime mode">
-            <Lock className="size-3.5" /> Supervised
-          </button>
           <button className="agent-toolbar-button" type="button" title="Terminal drawer">
             <Terminal className="size-3.5" /> Terminal
           </button>
@@ -468,9 +463,11 @@ export function AgentWorkspace() {
           <section className="flex min-w-0 flex-1 flex-col">
             <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-6">
               <div className="mx-auto w-full max-w-3xl space-y-5">
-                {messages.map((message) => (
-                  <TimelineMessage key={message.id} message={message} />
-                ))}
+                {messages
+                  .filter((message) => message.role !== "system")
+                  .map((message) => (
+                    <TimelineMessage key={message.id} message={message} />
+                  ))}
                 {running ? <WorkingRow status={status} /> : null}
               </div>
             </div>
@@ -509,12 +506,6 @@ export function AgentWorkspace() {
                       </option>
                     ))}
                   </select>
-                  <span className="hidden items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--agent-muted)] sm:flex">
-                    <Hammer className="size-3.5" /> Build
-                  </span>
-                  <span className="hidden items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--agent-muted)] sm:flex">
-                    <Lock className="size-3.5" /> Supervised
-                  </span>
                   <div className="flex-1" />
                   <button
                     type="button"
