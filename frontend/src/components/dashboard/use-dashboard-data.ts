@@ -47,7 +47,6 @@ export function useDashboardData() {
     onLaunch: actions.onLaunch,
     onStop: actions.onStop,
     onBenchmark: actions.onBenchmark,
-    onNavigateChat: navigate("/chat"),
     onNavigateLogs: navigate("/logs"),
     onNewRecipe: navigate("/recipes?new=1"),
     onViewAll: navigate("/recipes"),

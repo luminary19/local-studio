@@ -4,7 +4,7 @@ export type {
   DownloadFileStatus,
   DownloadFileInfo,
   ModelDownload,
-} from "../../../../shared/src";
+} from "../shared/recipe-types";
 
 export type {
   ServiceInfo,
@@ -24,7 +24,7 @@ export type {
   CompatibilityCheck,
   SystemRuntimeInfo,
   CompatibilityReport,
-} from "../../../../shared/src";
+} from "../shared/system-types";
 
 export type {
   LaunchResult,

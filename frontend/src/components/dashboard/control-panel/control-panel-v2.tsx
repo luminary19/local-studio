@@ -20,7 +20,6 @@ export function ControlPanel(props: DashboardLayoutProps) {
         isConnected={props.isConnected}
         platformKind={props.platformKind}
         inferencePort={props.inferencePort}
-        onNavigateChat={props.onNavigateChat}
         onNavigateLogs={props.onNavigateLogs}
         onBenchmark={props.onBenchmark}
         benchmarking={props.benchmarking}

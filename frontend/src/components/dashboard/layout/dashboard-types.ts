@@ -24,7 +24,6 @@ export interface DashboardLayoutProps {
   lease?: LeaseInfo | null;
   isConnected: boolean;
   inferencePort?: number;
-  onNavigateChat: () => void;
   onNavigateLogs: () => void;
   onBenchmark: () => void;
   onStop: () => void;

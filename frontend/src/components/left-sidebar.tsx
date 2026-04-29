@@ -6,7 +6,6 @@ import {
   BarChart3,
   Database,
   HardDrive,
-  MessageCircle,
   Server,
   Settings,
   Sun,
@@ -24,7 +23,6 @@ const tabs = [
   { href: "/", label: "Status", icon: BarChart3 },
   { href: "/usage", label: "Usage", icon: Database },
   { href: "/recipes", label: "Models", icon: HardDrive },
-  { href: "/chat", label: "Chat", icon: MessageCircle },
   { href: "/logs", label: "Server", icon: Server },
   { href: "/configs", label: "Settings", icon: Settings },
 ];
@@ -59,9 +57,6 @@ function LogoMark() {
 function isRouteActive(pathname: string, href: string): boolean {
   if (href === "/") {
     return pathname === "/" || pathname === "/discover";
-  }
-  if (href === "/chat") {
-    return pathname === "/chat" || pathname.startsWith("/chat/");
   }
   return pathname.startsWith(href);
 }

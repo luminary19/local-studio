@@ -385,6 +385,48 @@ export function createApiCore(params: { baseUrl: string; useProxy: boolean }) {
     if (finalPayload) yield finalPayload;
   };
 
+  const getSseJson = async (
+    endpoint: string,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<AsyncGenerator<ChatRunStreamEvent>> => {
+    const url = buildUrl(endpoint);
+    const headers = buildHeaders({ Accept: "text/event-stream" });
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers,
+      signal: options.signal,
+      credentials: "include",
+    });
+
+    if (!response.ok || !response.body) {
+      const errorBody = await response.json().catch(() => ({ detail: "Request failed" }));
+      const errorMessage =
+        errorBody.detail || errorBody.error?.message || `HTTP ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    const reader = response.body.getReader();
+    const signal = options.signal;
+
+    if (signal) {
+      const onAbort = () => {
+        try {
+          void reader.cancel();
+        } catch {
+          /* ignore */
+        }
+      };
+      if (signal.aborted) {
+        onAbort();
+      } else {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+    }
+
+    return parseSseStream(reader, signal);
+  };
+
   const postSseJson = async (
     endpoint: string,
     payload: unknown,
@@ -442,6 +484,24 @@ export function createApiCore(params: { baseUrl: string; useProxy: boolean }) {
     return { runId, stream: parseSseStream(reader, signal) };
   };
 
+  /** Poll the controller health endpoint. Returns true if reachable. */
+  const healthPoll = async (timeoutMs = 5_000): Promise<boolean> => {
+    try {
+      const url = buildUrl("/health");
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      const response = await fetch(url, {
+        method: "GET",
+        signal: controller.signal,
+        credentials: "include",
+      });
+      clearTimeout(timeoutId);
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
+
   return {
     baseUrl,
     useProxy,
@@ -449,5 +509,7 @@ export function createApiCore(params: { baseUrl: string; useProxy: boolean }) {
     buildHeaders,
     request,
     postSseJson,
+    getSseJson,
+    healthPoll,
   };
 }

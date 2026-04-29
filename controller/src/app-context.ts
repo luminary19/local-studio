@@ -11,11 +11,9 @@ import { DownloadManager } from "./modules/engines/layers/download-manager";
 import { createEngineCoordinator } from "./modules/engines/layers/engine-coordinator";
 import { createLogger, resolveLogLevel } from "./core/logger";
 import { primaryLogPathFor } from "./core/log-files";
-import { ChatStore } from "./modules/chat/store";
 import { DownloadStore } from "./modules/engines/layers/download-store";
 import { PeakMetricsStore, LifetimeMetricsStore } from "./modules/system/metrics-store";
 import { RecipeStore } from "./modules/models/recipes/recipe-store";
-import { ChatRunManager } from "./modules/chat/agent/run-manager";
 import { JobStore } from "./stores/job-store";
 import { JobManager } from "./modules/jobs/job-manager";
 
@@ -30,7 +28,6 @@ export const createAppContext = (): AppContext => {
   const dbPath = resolve(config.db_path);
 
   const recipeStore = new RecipeStore(dbPath);
-  const chatStore = new ChatStore(dbPath);
   const downloadStore = new DownloadStore(dbPath);
   const peakMetricsStore = new PeakMetricsStore(dbPath);
   const lifetimeMetricsStore = new LifetimeMetricsStore(dbPath);
@@ -43,7 +40,6 @@ export const createAppContext = (): AppContext => {
   const launchState = createLaunchState();
   const { registry: metricsRegistry, metrics } = createMetrics();
   const processManager = createProcessManager(config, logger, eventManager);
-  let runManager: ChatRunManager | null = null;
   const downloadManager = new DownloadManager(config, downloadStore, eventManager, logger);
 
   const engineService = createEngineCoordinator({
@@ -53,7 +49,7 @@ export const createAppContext = (): AppContext => {
     processManager,
     recipeStore,
     downloadManager,
-    abortRunsForModel: (modelName) => runManager?.abortRunsForModel(modelName) ?? 0,
+    abortRunsForModel: () => 0,
   });
 
   lifetimeMetricsStore.ensureFirstStarted();
@@ -70,20 +66,17 @@ export const createAppContext = (): AppContext => {
     engineService,
     stores: {
       recipeStore,
-      chatStore,
       downloadStore,
       peakMetricsStore,
       lifetimeMetricsStore,
       jobStore,
     },
-  } as Omit<AppContext, "runManager" | "jobManager">;
+  } as Omit<AppContext, "jobManager">;
 
-  runManager = new ChatRunManager(baseContext as AppContext);
   const jobManager = new JobManager(baseContext as AppContext, jobStore);
 
   return {
     ...baseContext,
-    runManager,
     jobManager,
   };
 };

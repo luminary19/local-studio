@@ -1,7 +1,7 @@
 // CRITICAL
 "use client";
 
-import { RefreshButton, PageState } from "@/components/shared";
+import { RefreshButton, PageState } from "@/ui";
 import { DailyUsageChart } from "./_components/daily-usage-chart";
 import { ModelPerformanceTable } from "./_components/model-performance-table";
 import { PerformanceDetails } from "./_components/performance-details";

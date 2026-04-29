@@ -4,7 +4,6 @@ import { swaggerUI } from "@hono/swagger-ui";
 import { cors } from "hono/cors";
 import type { AppContext } from "../types/context";
 import { isHttpStatus } from "../core/errors";
-import { registerAllChatRoutes } from "../modules/chat/routes";
 import { registerEngineRoutes } from "../modules/engines/routes";
 import { registerSystemRoutes } from "../modules/system/routes";
 import { registerModelsRoutes } from "../modules/models/routes";
@@ -60,7 +59,6 @@ export const createApp = (context: AppContext): Hono => {
   registerEngineRoutes(app, context);
   registerModelsRoutes(app, context);
   registerStudioRoutes(app, context);
-  registerAllChatRoutes(app, context);
   registerAudioRoutes(app, context);
   registerJobsRoutes(app, context, context.jobManager);
   registerAllProxyRoutes(app, context);

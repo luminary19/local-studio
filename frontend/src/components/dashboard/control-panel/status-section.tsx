@@ -13,7 +13,6 @@ interface StatusSectionProps {
   isConnected: boolean;
   platformKind?: RuntimePlatformKind | null;
   inferencePort?: number;
-  onNavigateChat: () => void;
   onNavigateLogs: () => void;
   onBenchmark: () => void;
   benchmarking: boolean;
@@ -33,7 +32,6 @@ export function StatusSection({
   isConnected,
   platformKind,
   inferencePort,
-  onNavigateChat,
   onNavigateLogs,
   onBenchmark,
   benchmarking,
@@ -121,7 +119,6 @@ export function StatusSection({
               onViewAll={onViewAll}
             />
           )}
-          <ActionBtn label="Chat" onClick={onNavigateChat} disabled={!isRunning} />
           <ActionBtn label="Logs" onClick={onNavigateLogs} disabled={!isRunning} />
           {isRunning ? (
             <ActionBtn

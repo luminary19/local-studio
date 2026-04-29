@@ -1,4 +1,4 @@
-import { createStateMachine, type StateMachineContainer } from "../../../../../shared/src/state-machine";
+import { createStateMachine, type StateMachineContainer } from "../../shared/state-machine";
 import type { DownloadFileInfo } from "../types";
 
 // ── States ────────────────────────────────────────────────────────────────

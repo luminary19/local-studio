@@ -1,5 +1,4 @@
 // CRITICAL
-
 export const CONTROLLER_EVENTS = {
   STATUS: "status",
   GPU: "gpu",
@@ -65,16 +64,6 @@ export type ControllerEventDomain =
   | "controller"
   | "mcp";
 
-export const CONTROLLER_BROWSER_EVENT_CHANNEL = {
-  recipe: "vllm:recipe-event",
-  runtime: "vllm:runtime-event",
-  controller: "vllm:controller-event",
-  mcp: "vllm:controller-event",
-} as const;
-
-export type ControllerBrowserEventChannel =
-  (typeof CONTROLLER_BROWSER_EVENT_CHANNEL)[ControllerEventDomain];
-
 const CONTROLLER_EVENT_DOMAIN_MAP: Record<
   ControllerStreamEventType,
   ControllerEventDomain
@@ -103,6 +92,16 @@ const CONTROLLER_EVENT_DOMAIN_MAP: Record<
   [CONTROLLER_EVENTS.RUNTIME_ROCM_UPGRADED]: "runtime",
   [CONTROLLER_EVENTS.JOB_UPDATED]: "controller",
 };
+
+export const CONTROLLER_BROWSER_EVENT_CHANNEL = {
+  recipe: "vllm:recipe-event",
+  runtime: "vllm:runtime-event",
+  controller: "vllm:controller-event",
+  mcp: "vllm:controller-event",
+} as const;
+
+export type ControllerBrowserEventChannel =
+  (typeof CONTROLLER_BROWSER_EVENT_CHANNEL)[ControllerEventDomain];
 
 const CONTROLLER_STREAM_EVENT_SET = new Set<string>(
   CONTROLLER_STREAM_EVENT_TYPES,

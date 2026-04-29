@@ -13,7 +13,7 @@ import type { RecipeStore } from "../../models/recipes/recipe-store";
 import { LIFECYCLE_READY_TIMEOUT_MS } from "../configs";
 import { createEngineLifecycleMachine, type EngineLifecycleMachine, type EngineLifecycleState, type EngineLifecycleEvent } from "./engine-lifecycle-machine";
 import type { EngineService, RuntimeType, UpgradeResult, RuntimeInfo, DownloadRequest, DownloadHandle, DownloadStatus, HfModel, EvictResult, CancelResult } from "../services/engine-service";
-import type { ModelDownload } from "../../../../../shared/src";
+import type { ModelDownload } from "../../shared/recipe-types";
 
 import { DownloadManager } from "./download-manager";
 import { createDownloadMachine, type DownloadMachine } from "./download-machine";

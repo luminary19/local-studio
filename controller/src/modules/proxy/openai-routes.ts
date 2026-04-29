@@ -71,20 +71,15 @@ export const registerOpenAIRoutes = (app: Hono, context: AppContext): void => {
   ): void => {
     if (!sessionId) return;
 
-    const storedUsage = context.stores.chatStore.getUsage(sessionId);
     const promptTokens = usage?.["prompt_tokens"] ?? 0;
     const completionTokens = usage?.["completion_tokens"] ?? 0;
     const reasoningTokens = usage?.["reasoning_tokens"] ?? 0;
 
-    const prompt = storedUsage.prompt_tokens + promptTokens;
-    const completion = storedUsage.completion_tokens + completionTokens;
-
     result["session_id"] = sessionId;
     result["session_usage"] = {
-      ...storedUsage,
-      prompt_tokens: prompt,
-      completion_tokens: completion,
-      total_tokens: prompt + completion,
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      total_tokens: promptTokens + completionTokens,
       current_prompt_tokens: promptTokens,
       current_completion_tokens: completionTokens,
       current_reasoning_tokens: typeof reasoningTokens === "number" ? reasoningTokens : 0,

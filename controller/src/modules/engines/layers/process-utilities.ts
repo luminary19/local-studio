@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { Recipe } from "../../models/types";
 import { fetchLocal } from "../../../http/local-fetch";
-import type { Backend } from "../../../../../shared/src";
+import type { Backend } from "../../shared/recipe-types";
 
 /**
  * Split a command line string into arguments.

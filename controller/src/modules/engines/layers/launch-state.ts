@@ -1,5 +1,5 @@
-import type { StateMachineContainer } from "../../../../../shared/src/state-machine";
-import { createStateMachine } from "../../../../../shared/src/state-machine";
+import type { StateMachineContainer } from "../../shared/state-machine";
+import { createStateMachine } from "../../shared/state-machine";
 
 export type LaunchPhase = "idle" | "launching" | "preempting";
 

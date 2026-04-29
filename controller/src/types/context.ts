@@ -6,26 +6,11 @@ import type { ControllerMetrics, MetricsRegistry } from "../modules/system/metri
 import type { ProcessManager } from "../modules/engines/layers/process-manager";
 import type { EngineCoordinator } from "../modules/engines/layers/engine-coordinator";
 import type { DownloadManager } from "../modules/engines/layers/download-manager";
-import type { ChatRunOptions, ChatRunStream } from "../modules/chat/agent/run-manager-types";
-import type { ChatStore } from "../modules/chat/store";
 import type { DownloadStore } from "../modules/engines/layers/download-store";
 import type { LifetimeMetricsStore, PeakMetricsStore } from "../modules/system/metrics-store";
 import type { RecipeStore } from "../modules/models/recipes/recipe-store";
 import type { JobStore } from "../stores/job-store";
 import type { JobType } from "../modules/jobs/types";
-
-/**
- * Minimal interface for the chat run manager as seen through the app context.
- * The concrete ChatRunManager class satisfies this interface structurally.
- */
-export interface IChatRunManager {
-  startRun(options: ChatRunOptions): Promise<ChatRunStream>;
-  abortRun(runId: string): boolean;
-  abortRunsForModel(modelName: string): number;
-  resolveApproval(runId: string, toolCallId: string, approved: boolean, reason?: string): boolean;
-  continueRun(sessionId: string, runId: string): Promise<ChatRunStream>;
-  followUpRun(sessionId: string, content: string): Promise<ChatRunStream>;
-}
 
 /**
  * Minimal interface for the job manager as seen through the app context.
@@ -50,11 +35,9 @@ export interface AppContext {
   processManager: ProcessManager;
   downloadManager: DownloadManager;
   engineService: EngineCoordinator;
-  runManager: IChatRunManager;
   jobManager: IJobManager;
   stores: {
     recipeStore: RecipeStore;
-    chatStore: ChatStore;
     downloadStore: DownloadStore;
     peakMetricsStore: PeakMetricsStore;
     lifetimeMetricsStore: LifetimeMetricsStore;

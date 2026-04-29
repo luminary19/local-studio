@@ -1,4 +1,3 @@
-// CRITICAL
 /**
  * System configuration and runtime types.
  */
@@ -119,19 +118,4 @@ export interface CompatibilityReport {
   torch: RuntimeTorchBuildInfo;
   backends: SystemRuntimeInfo["backends"];
   checks: CompatibilityCheck[];
-}
-
-export interface ConfigData {
-  config: SystemConfig;
-  services: ServiceInfo[];
-  environment: EnvironmentInfo;
-  runtime: SystemRuntimeInfo;
-}
-
-export interface DeepResearchConfig {
-  enabled: boolean;
-  maxSources: number;
-  searchDepth: "shallow" | "medium" | "deep";
-  autoSummarize: boolean;
-  includeCitations: boolean;
 }

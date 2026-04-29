@@ -1,12 +1,11 @@
 import type { RecipeId } from "../../types/brand";
+import type { Backend as SharedBackend, RecipeBase } from "../shared/recipe-types";
 import type {
-  Backend as SharedBackend,
-  RecipeBase,
   ServiceInfo,
   SystemConfig,
   EnvironmentInfo,
   SystemRuntimeInfo,
-} from "../../../../shared/src";
+} from "../shared/system-types";
 
 export type {
   ServiceInfo,
@@ -26,7 +25,7 @@ export type {
   CompatibilityCheck,
   SystemRuntimeInfo,
   CompatibilityReport,
-} from "../../../../shared/src";
+} from "../shared/system-types";
 
 export type Backend = SharedBackend;
 
