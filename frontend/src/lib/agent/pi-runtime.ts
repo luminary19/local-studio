@@ -162,35 +162,40 @@ class PiRpcSession extends EventEmitter {
   private starting: Promise<void> | null = null;
   private currentModelId = "";
   private currentCwd = "";
+  private currentPiSessionId: string | null = null;
   private agentDir = "";
 
-  async ensureStarted(modelId: string, cwd?: string): Promise<void> {
+  async ensureStarted(modelId: string, cwd?: string, piSessionId?: string | null): Promise<void> {
     const resolvedCwd = await resolveAgentCwd(cwd);
-    if (
+    const desiredSessionId = piSessionId ?? null;
+    const matches =
       this.process &&
       !this.process.killed &&
       this.currentModelId === modelId &&
-      this.currentCwd === resolvedCwd
-    ) {
-      return;
-    }
-    if (this.starting) await this.starting;
-    if (
-      this.process &&
-      !this.process.killed &&
-      this.currentModelId === modelId &&
-      this.currentCwd === resolvedCwd
-    ) {
-      return;
-    }
+      this.currentCwd === resolvedCwd &&
+      this.currentPiSessionId === desiredSessionId;
+    if (matches) return;
 
-    this.starting = this.start(modelId, resolvedCwd).finally(() => {
+    if (this.starting) await this.starting;
+    const matchesAfter =
+      this.process &&
+      !this.process.killed &&
+      this.currentModelId === modelId &&
+      this.currentCwd === resolvedCwd &&
+      this.currentPiSessionId === desiredSessionId;
+    if (matchesAfter) return;
+
+    this.starting = this.start(modelId, resolvedCwd, desiredSessionId).finally(() => {
       this.starting = null;
     });
     await this.starting;
   }
 
-  private async start(modelId: string, cwd: string): Promise<void> {
+  private async start(
+    modelId: string,
+    cwd: string,
+    piSessionId: string | null,
+  ): Promise<void> {
     await this.stop();
     const { models, agentDir } = await refreshPiModels();
     const selectedModel = models.find((model) => model.id === modelId);
@@ -200,6 +205,7 @@ class PiRpcSession extends EventEmitter {
     this.agentDir = agentDir;
     this.currentModelId = modelId;
     this.currentCwd = cwd;
+    this.currentPiSessionId = piSessionId;
 
     const args = [
       "--mode",
@@ -211,6 +217,11 @@ class PiRpcSession extends EventEmitter {
     ];
     if (selectedModel.reasoning) {
       args.push("--thinking", "high");
+    }
+    if (piSessionId) {
+      // Resume a specific pi session by UUID. Pi accepts a partial UUID and
+      // resolves it within the current cwd's session directory.
+      args.push("--session", piSessionId);
     }
 
     const child = spawn(piBinaryPath(), args, {
@@ -364,6 +375,7 @@ class PiRpcSession extends EventEmitter {
       running: Boolean(this.process && !this.process.killed),
       modelId: this.currentModelId,
       cwd: this.currentCwd,
+      piSessionId: this.currentPiSessionId,
       agentDir: this.agentDir,
     };
   }

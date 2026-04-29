@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { AssistantMarkdown } from "./assistant-markdown";
+import { SessionsSidebar } from "./sessions-sidebar";
 
 type WebviewElement = HTMLElement & {
   goBack: () => void;
@@ -81,6 +82,8 @@ type DesktopBridge = {
 const SESSION_ID = "vllm-studio-agent";
 const DEFAULT_AGENT_CWD = "";
 const SELECTED_PROJECT_KEY = "vllm-studio.agent.selectedProjectId";
+const SESSIONS_COLLAPSED_KEY = "vllm-studio.agent.sessionsCollapsed";
+const ACTIVE_PI_SESSION_KEY = "vllm-studio.agent.activePiSessionId";
 
 function getDesktopBridge(): DesktopBridge | null {
   if (typeof window === "undefined") return null;
@@ -118,6 +121,35 @@ function extractToolText(value: unknown): string {
     .join("\n");
 }
 
+// Append a delta to the last block of `kind` if it's currently at the end of
+// the timeline; otherwise start a fresh block. This preserves the temporal
+// order in which Pi emits thinking / text / tool events.
+function appendDelta(
+  blocks: AssistantBlock[],
+  kind: "text" | "thinking",
+  delta: string,
+): AssistantBlock[] {
+  const last = blocks[blocks.length - 1];
+  if (last && last.kind === kind) {
+    const updated: AssistantBlock = { ...last, text: last.text + delta };
+    return [...blocks.slice(0, -1), updated];
+  }
+  return [...blocks, { kind, id: newId(kind), text: delta }];
+}
+
+function upsertTool(
+  blocks: AssistantBlock[],
+  toolCallId: string,
+  patch: (tool: ToolBlock) => ToolBlock,
+  fallback: () => ToolBlock,
+): AssistantBlock[] {
+  const idx = blocks.findIndex((b) => b.kind === "tool" && b.id === toolCallId);
+  if (idx === -1) return [...blocks, fallback()];
+  const next = blocks.slice();
+  next[idx] = patch(next[idx] as ToolBlock);
+  return next;
+}
+
 export function AgentWorkspace() {
   const [models, setModels] = useState<AgentModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
@@ -143,6 +175,8 @@ export function AgentWorkspace() {
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [projectPickerInput, setProjectPickerInput] = useState("");
   const [projectPickerError, setProjectPickerError] = useState("");
+  const [activePiSessionId, setActivePiSessionId] = useState<string | null>(null);
+  const [sessionsCollapsed, setSessionsCollapsed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const webviewRef = useRef<WebviewElement | null>(null);
@@ -184,6 +218,27 @@ export function AgentWorkspace() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, status]);
+
+  // Restore the sessions sidebar collapsed/expanded preference + the last
+  // resumed pi session id across reloads.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const collapsed = window.localStorage.getItem(SESSIONS_COLLAPSED_KEY);
+    if (collapsed === "1") setSessionsCollapsed(true);
+    const last = window.localStorage.getItem(ACTIVE_PI_SESSION_KEY);
+    if (last) setActivePiSessionId(last);
+  }, []);
+
+  const persistSessionsCollapsed = useCallback((value: boolean) => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(SESSIONS_COLLAPSED_KEY, value ? "1" : "0");
+  }, []);
+
+  const persistActivePiSessionId = useCallback((id: string | null) => {
+    if (typeof window === "undefined") return;
+    if (id) window.localStorage.setItem(ACTIVE_PI_SESSION_KEY, id);
+    else window.localStorage.removeItem(ACTIVE_PI_SESSION_KEY);
+  }, []);
 
   const loadProjects = useCallback(async (): Promise<ProjectEntry[]> => {
     if (desktopBridge) {
@@ -234,8 +289,13 @@ export function AgentWorkspace() {
       setSelectedProjectId(project.id);
       setAgentCwd(project.path);
       persistSelectedProjectId(project.id);
+      // A different project has its own session pool — clear the active pi
+      // session so the next turn starts a fresh one in the new project.
+      setActivePiSessionId(null);
+      persistActivePiSessionId(null);
+      setMessages([]);
     },
-    [persistSelectedProjectId],
+    [persistActivePiSessionId, persistSelectedProjectId],
   );
 
   const addProjectFromPath = useCallback(
@@ -350,36 +410,6 @@ export function AgentWorkspace() {
     );
   }
 
-  // Append a delta to the last block of `kind` if it's currently at the end of
-  // the timeline; otherwise start a fresh block. This preserves the temporal
-  // order in which Pi emits thinking / text / tool events, so the rendered
-  // layout never reflows when subsequent events arrive.
-  function appendDelta(
-    blocks: AssistantBlock[],
-    kind: "text" | "thinking",
-    delta: string,
-  ): AssistantBlock[] {
-    const last = blocks[blocks.length - 1];
-    if (last && last.kind === kind) {
-      const updated: AssistantBlock = { ...last, text: last.text + delta };
-      return [...blocks.slice(0, -1), updated];
-    }
-    return [...blocks, { kind, id: newId(kind), text: delta }];
-  }
-
-  function upsertTool(
-    blocks: AssistantBlock[],
-    toolCallId: string,
-    patch: (tool: ToolBlock) => ToolBlock,
-    fallback: () => ToolBlock,
-  ): AssistantBlock[] {
-    const idx = blocks.findIndex((b) => b.kind === "tool" && b.id === toolCallId);
-    if (idx === -1) return [...blocks, fallback()];
-    const next = blocks.slice();
-    next[idx] = patch(next[idx] as ToolBlock);
-    return next;
-  }
-
   function applyPiEvent(assistantId: string, event: Record<string, unknown>) {
     const eventType = event.type;
 
@@ -481,6 +511,176 @@ export function AgentWorkspace() {
     // interleaved order.
   }
 
+  // Replay a past pi session into the renderer by hydrating user messages
+  // (recorded as message_end events with role=user) and walking every other
+  // event through applyPiEvent so the same block-ordered timeline used for
+  // live turns is reused for replay.
+  const loadAndReplaySession = useCallback(
+    async (cwd: string, piSessionId: string) => {
+      setError("");
+      setStatus("loading");
+      try {
+        const response = await fetch(
+          `/api/agent/sessions/${encodeURIComponent(piSessionId)}?cwd=${encodeURIComponent(cwd)}`,
+          { cache: "no-store" },
+        );
+        const payload = (await response.json()) as { events?: Record<string, unknown>[]; error?: string };
+        if (!response.ok) throw new Error(payload.error || "Failed to load session");
+
+        const replayed: ChatMessage[] = [];
+        let pendingAssistantId: string | null = null;
+        const ensureAssistant = () => {
+          if (pendingAssistantId) return pendingAssistantId;
+          const id = newId("assistant");
+          replayed.push({ id, role: "assistant", text: "", blocks: [], timestamp: nowLabel() });
+          pendingAssistantId = id;
+          return id;
+        };
+        const flushAssistant = () => {
+          pendingAssistantId = null;
+        };
+
+        // We mutate `replayed` in place by reusing applyPiEvent's logic on a
+        // local working set rather than going through React state for each of
+        // potentially thousands of events.
+        const localPatch = (assistantId: string, patch: (msg: ChatMessage) => ChatMessage) => {
+          const idx = replayed.findIndex((m) => m.id === assistantId);
+          if (idx !== -1) replayed[idx] = patch(replayed[idx]);
+        };
+
+        for (const event of payload.events ?? []) {
+          const type = event.type;
+          if (type === "message_end") {
+            const message = event.message as
+              | {
+                  role?: string;
+                  content?: Array<{ type?: string; text?: string; thinking?: string }>;
+                }
+              | undefined;
+            if (message?.role === "user") {
+              flushAssistant();
+              const text = Array.isArray(message.content)
+                ? message.content
+                    .filter((part) => part?.type === "text" && typeof part.text === "string")
+                    .map((part) => part.text)
+                    .join("\n")
+                : "";
+              if (text) {
+                replayed.push({
+                  id: newId("user"),
+                  role: "user",
+                  text,
+                  timestamp: nowLabel(),
+                });
+              }
+              continue;
+            }
+            if (message?.role === "assistant" && pendingAssistantId) {
+              flushAssistant();
+              continue;
+            }
+          }
+
+          // Everything else (text_delta, thinking_delta, toolcall_end,
+          // tool_execution_*) feeds into the active assistant turn.
+          const assistantId = ensureAssistant();
+          const before = replayed.find((m) => m.id === assistantId);
+          if (!before) continue;
+          // Apply the same logic locally. This intentionally duplicates a tiny
+          // portion of applyPiEvent because it operates on the local array
+          // rather than React state.
+          const eventType = event.type;
+          if (eventType === "message_update") {
+            const ame = event.assistantMessageEvent as Record<string, unknown> | undefined;
+            const updateType = ame?.type;
+            if (updateType === "text_delta" && typeof ame?.delta === "string") {
+              const delta = ame.delta;
+              localPatch(assistantId, (msg) => ({
+                ...msg,
+                blocks: appendDelta(msg.blocks ?? [], "text", delta),
+              }));
+            } else if (updateType === "thinking_delta" && typeof ame?.delta === "string") {
+              const delta = ame.delta;
+              localPatch(assistantId, (msg) => ({
+                ...msg,
+                blocks: appendDelta(msg.blocks ?? [], "thinking", delta),
+              }));
+            } else if (updateType === "toolcall_end") {
+              const toolCall = ame?.toolCall as
+                | { id?: string; name?: string; arguments?: unknown }
+                | undefined;
+              if (toolCall) {
+                const id = toolCall.id || newId("tool");
+                const name = toolCall.name || "tool";
+                const text = JSON.stringify(toolCall.arguments ?? {}, null, 2);
+                localPatch(assistantId, (msg) => ({
+                  ...msg,
+                  blocks: upsertTool(
+                    msg.blocks ?? [],
+                    id,
+                    (existing) => ({ ...existing, text: existing.text || text }),
+                    () => ({ kind: "tool", id, name, status: "running", text }),
+                  ),
+                }));
+              }
+            }
+          } else if (eventType === "tool_execution_start") {
+            const id = String(event.toolCallId || newId("tool"));
+            const name = String(event.toolName || "tool");
+            localPatch(assistantId, (msg) => ({
+              ...msg,
+              blocks: upsertTool(
+                msg.blocks ?? [],
+                id,
+                (existing) => existing,
+                () => ({ kind: "tool", id, name, status: "running", text: "" }),
+              ),
+            }));
+          } else if (eventType === "tool_execution_update" || eventType === "tool_execution_end") {
+            const id = String(event.toolCallId || "");
+            if (id) {
+              const resultText = extractToolText(event.partialResult || event.result);
+              localPatch(assistantId, (msg) => ({
+                ...msg,
+                blocks: upsertTool(
+                  msg.blocks ?? [],
+                  id,
+                  (existing) => ({
+                    ...existing,
+                    status:
+                      eventType === "tool_execution_end"
+                        ? ((event.isError ? "error" : "done") as ToolBlock["status"])
+                        : existing.status,
+                    text: resultText || existing.text,
+                  }),
+                  () => ({
+                    kind: "tool",
+                    id,
+                    name: "tool",
+                    status:
+                      eventType === "tool_execution_end"
+                        ? ((event.isError ? "error" : "done") as ToolBlock["status"])
+                        : "running",
+                    text: resultText,
+                  }),
+                ),
+              }));
+            }
+          }
+        }
+
+        setMessages(replayed);
+        setActivePiSessionId(piSessionId);
+        persistActivePiSessionId(piSessionId);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load session");
+      } finally {
+        setStatus("idle");
+      }
+    },
+    [persistActivePiSessionId],
+  );
+
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
     const text = input.trim();
@@ -512,6 +712,7 @@ export function AgentWorkspace() {
           // Send undefined (not empty string) when no project picked so the
           // server-side resolver can fall back to the last-used project / $HOME.
           cwd: agentCwd.trim() || undefined,
+          piSessionId: activePiSessionId,
         }),
       });
       if (!response.ok || !response.body) {
@@ -538,7 +739,20 @@ export function AgentWorkspace() {
             setError(payload.error);
             setStatus("idle");
           }
-          if (payload.type === "pi") applyPiEvent(assistantId, payload.event);
+          if (payload.type === "pi") {
+            const piEvent = payload.event;
+            // Capture the session id pi assigns when starting fresh. Subsequent
+            // turns will pass this back in `piSessionId` so the same session
+            // continues, and the sidebar can highlight the active row.
+            const eventId = piEvent.id;
+            if (piEvent.type === "session" && typeof eventId === "string") {
+              if (activePiSessionId !== eventId) {
+                setActivePiSessionId(eventId);
+                persistActivePiSessionId(eventId);
+              }
+            }
+            applyPiEvent(assistantId, piEvent);
+          }
         }
       }
     } catch (err) {
@@ -617,6 +831,8 @@ export function AgentWorkspace() {
       textareaRef.current.style.height = "";
     }
     setError("");
+    setActivePiSessionId(null);
+    persistActivePiSessionId(null);
   }
 
   const activeProject = useMemo(
@@ -698,6 +914,22 @@ export function AgentWorkspace() {
       ) : null}
 
       <div className="flex min-h-0 flex-1">
+        <SessionsSidebar
+          cwd={activeProject?.path ?? null}
+          activeSessionId={activePiSessionId}
+          onSelect={(id) => {
+            const cwd = activeProject?.path;
+            if (!cwd) return;
+            void loadAndReplaySession(cwd, id);
+          }}
+          onNew={newThread}
+          collapsed={sessionsCollapsed}
+          onToggleCollapsed={() => {
+            const next = !sessionsCollapsed;
+            setSessionsCollapsed(next);
+            persistSessionsCollapsed(next);
+          }}
+        />
         <section className="flex min-w-0 flex-1 flex-col">
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
             <div className="mx-auto w-full max-w-2xl">

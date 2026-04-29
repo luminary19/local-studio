@@ -9,6 +9,9 @@ type TurnRequest = {
   modelId?: string;
   message?: string;
   cwd?: string;
+  // Optional pi session UUID to resume a past conversation. Distinct from
+  // `sessionId`, which is the in-memory PiRpcSession key (one per browser tab).
+  piSessionId?: string | null;
 };
 
 function sse(controller: ReadableStreamDefaultController<Uint8Array>, payload: unknown) {
@@ -29,6 +32,10 @@ export async function POST(request: NextRequest) {
   const sessionId =
     typeof body.sessionId === "string" && body.sessionId.trim() ? body.sessionId.trim() : "default";
   const cwd = typeof body.cwd === "string" && body.cwd.trim() ? body.cwd.trim() : undefined;
+  const piSessionId =
+    typeof body.piSessionId === "string" && body.piSessionId.trim()
+      ? body.piSessionId.trim()
+      : null;
 
   if (!message) return Response.json({ error: "message is required" }, { status: 400 });
   if (!modelId) return Response.json({ error: "modelId is required" }, { status: 400 });
@@ -38,7 +45,7 @@ export async function POST(request: NextRequest) {
       try {
         const session = piRuntimeManager.getSession(sessionId);
         sse(controller, { type: "status", phase: "starting", sessionId, modelId, cwd });
-        await session.ensureStarted(modelId, cwd);
+        await session.ensureStarted(modelId, cwd, piSessionId);
         sse(controller, { type: "status", phase: "running", session: session.status });
         await session.prompt(message, (event) => {
           sse(controller, { type: "pi", event });
