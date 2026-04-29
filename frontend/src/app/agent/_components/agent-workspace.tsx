@@ -168,8 +168,8 @@ export function AgentWorkspace() {
   const [loadingModels, setLoadingModels] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [isMultiline, setIsMultiline] = useState(false);
-  const [browserUrl, setBrowserUrl] = useState("https://duckduckgo.com");
-  const [browserInput, setBrowserInput] = useState("https://duckduckgo.com");
+  const [browserUrl, setBrowserUrl] = useState("https://www.google.com");
+  const [browserInput, setBrowserInput] = useState("https://www.google.com");
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
@@ -773,12 +773,12 @@ export function AgentWorkspace() {
 
   function normalizeBrowserInput(raw: string): string {
     const value = raw.trim();
-    if (!value) return "https://duckduckgo.com";
+    if (!value) return "https://www.google.com";
     if (/^https?:\/\//i.test(value)) return value;
     if (/^[\w-]+(\.[\w-]+)+([/:?#].*)?$/.test(value) || /^localhost(:\d+)?/i.test(value)) {
       return `https://${value}`;
     }
-    return `https://duckduckgo.com/?q=${encodeURIComponent(value)}`;
+    return `https://www.google.com/search?q=${encodeURIComponent(value)}`;
   }
 
   function submitBrowserUrl(event: FormEvent) {
