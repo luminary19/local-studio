@@ -17,7 +17,7 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/store";
 import { useSidebarStatus } from "@/hooks/use-sidebar-status";
-import { useStopModel } from "@/hooks/use-stop-model";
+import { useModelLifecycle } from "@/hooks/use-model-lifecycle";
 import { ProjectsNavSection } from "@/components/projects-nav-section";
 
 const tabs = [
@@ -249,7 +249,7 @@ function ThemeToggleDesktop({ expanded }: { expanded: boolean }) {
 
 function StopButtonDesktop({ expanded }: { expanded: boolean }) {
   const status = useSidebarStatus();
-  const stop = useStopModel();
+  const { stop } = useModelLifecycle();
   if (!status.inferenceOnline) return null;
   return (
     <button
