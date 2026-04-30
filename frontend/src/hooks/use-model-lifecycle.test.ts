@@ -186,6 +186,20 @@ describe("useModelLifecycle", () => {
     hook.unmount();
   });
 
+  it("records launch request failures without opening a browser alert", async () => {
+    apiMocks.launch.mockRejectedValueOnce(new Error("HTTP 504"));
+    const hook = renderLifecycleHook();
+    await flushEffects();
+
+    await act(async () => {
+      await hook.result.start("alpha");
+    });
+
+    expect(hook.result.error).toBe("HTTP 504");
+    expect(globalThis.alert).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
   it("derives ready to idle after stop evicts the running process", async () => {
     const hook = renderLifecycleHook();
     await flushEffects();

@@ -70,7 +70,6 @@ export function useModelLifecycle(): ModelLifecycle {
     } catch (caught) {
       const message = (caught as Error).message;
       setError(message);
-      alert("Failed to start launch: " + message);
     }
   }, []);
 

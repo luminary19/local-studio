@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Square } from "lucide-react";
+import { LoaderCircle, Square, TriangleAlert, X } from "lucide-react";
 import { Button, UiModal, UiModalHeader } from "@/components/ui-kit";
 
 type StopTriggerArgs = {
@@ -41,18 +41,32 @@ export function ModelStopConfirm({ trigger, onStop }: ModelStopConfirmProps) {
         },
         stopping,
       })}
-      <UiModal isOpen={open} onClose={() => !stopping && setOpen(false)} maxWidth="max-w-sm">
+      <UiModal isOpen={open} onClose={() => !stopping && setOpen(false)} maxWidth="max-w-md">
         <UiModalHeader
           title="Stop model?"
-          icon={<Square className="h-4 w-4 text-(--err)" fill="currentColor" />}
+          icon={
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-(--err)/30 bg-(--err)/10">
+              <Square className="h-3.5 w-3.5 text-(--err)" fill="currentColor" />
+            </span>
+          }
           onClose={() => !stopping && setOpen(false)}
+          closeIcon={<X className="h-4 w-4" />}
+          className="border-(--err)/20 bg-(--err)/[0.03]"
         />
-        <div className="space-y-4 px-6 py-5">
-          <p className="text-sm leading-6 text-(--dim)">
-            This will stop the active inference process and free the GPU lease.
-          </p>
+        <div className="space-y-5 px-6 py-5">
+          <div className="rounded-xl border border-(--border)/70 bg-(--bg)/60 p-4">
+            <div className="flex gap-3">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-(--err)" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-(--fg)">Active inference will end now.</p>
+                <p className="text-sm leading-6 text-(--dim)">
+                  Running chats may stop responding while the GPU lease is released.
+                </p>
+              </div>
+            </div>
+          </div>
           {error && (
-            <div className="border border-(--err)/40 bg-(--err)/10 px-3 py-2 text-sm text-(--err)">
+            <div className="rounded-lg border border-(--err)/40 bg-(--err)/10 px-3 py-2 text-sm text-(--err)">
               {error}
             </div>
           )}
@@ -61,6 +75,7 @@ export function ModelStopConfirm({ trigger, onStop }: ModelStopConfirmProps) {
               Cancel
             </Button>
             <Button variant="danger" onClick={confirmStop} disabled={stopping}>
+              {stopping && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
               {stopping ? "Stopping..." : "Stop model"}
             </Button>
           </div>
