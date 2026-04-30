@@ -686,6 +686,25 @@ export function ChatPane({
       data-pane-id={paneId}
       className={`flex min-w-0 min-h-0 flex-1 flex-col bg-(--bg) ${isFocused ? "" : "opacity-95"}`}
     >
+      {running ? (
+        <div className="flex items-center gap-2 border-b border-(--border) bg-(--accent)/10 px-4 py-1.5 text-[11px] text-(--accent)">
+          <span className="relative inline-flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-(--accent) opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-(--accent)" />
+          </span>
+          <span className="font-medium uppercase tracking-[0.08em]">
+            Agent {activeTab?.status === "starting" ? "starting" : "working"}…
+          </span>
+          <span className="opacity-70">Stop the turn before sending a new message.</span>
+          <button
+            type="button"
+            onClick={() => void abortTurn()}
+            className="ml-auto inline-flex h-5 items-center gap-1 rounded border border-(--accent)/40 px-1.5 text-[10px] uppercase tracking-[0.08em] hover:bg-(--accent)/20"
+          >
+            <Square className="h-2.5 w-2.5" /> Stop
+          </button>
+        </div>
+      ) : null}
       {activeTab?.error ? (
         <div className="border-b border-(--border) bg-(--err)/10 px-4 py-2 text-xs text-(--err)">
           {activeTab.error}
@@ -704,15 +723,17 @@ export function ChatPane({
               </p>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="divide-y divide-(--border)/50">
               {(activeTab?.messages ?? [])
                 .filter((m) => m.role !== "system")
                 .map((message) => (
-                  <TimelineMessage key={message.id} message={message} />
+                  <div key={message.id} className="py-4 first:pt-0 last:pb-0">
+                    <TimelineMessage message={message} />
+                  </div>
                 ))}
               {running ? (
-                <div className="flex items-center gap-2 text-xs text-(--dim)">
-                  <span className="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-(--dim)" />
+                <div className="flex items-center gap-2 py-4 text-xs text-(--dim)">
+                  <span className="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-(--accent)" />
                   <span>Pi is {activeTab?.status}…</span>
                 </div>
               ) : null}
@@ -1014,9 +1035,9 @@ function TimelineMessage({ message }: { message: ChatMessage }) {
           {blocks.map((block) => {
             if (block.kind === "thinking") {
               return (
-                <details key={block.id} className="text-xs">
+                <details key={block.id} className="text-xs" open>
                   <summary className="cursor-pointer list-none text-[11px] italic text-(--dim) hover:text-(--fg)">
-                    Show thinking
+                    Thinking
                   </summary>
                   <pre className="mt-2 whitespace-pre-wrap border-l-2 border-(--border) pl-3 font-mono text-[11px] leading-5 text-(--dim)">
                     {block.text}
