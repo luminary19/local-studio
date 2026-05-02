@@ -162,6 +162,8 @@ export const appendExtraArguments = (
     "tags",
     "status",
     "llama_bin",
+    "launch_command",
+    "custom_command",
     "docker_container",
     "docker_image",
     "docker-container",
@@ -215,6 +217,71 @@ export const appendExtraArguments = (
     command.push(flag, String(value));
   }
   return command;
+};
+
+const normalizeLaunchCommand = (command: string): string => {
+  return command
+    .replace(/\\\s*\n\s*\+?\s*/g, " ")
+    .replace(/^\s*\+\s*/gm, "")
+    .trim();
+};
+
+const splitLaunchCommand = (command: string): string[] => {
+  const normalized = normalizeLaunchCommand(command);
+  const result: string[] = [];
+  let current = "";
+  let quote: "'" | "\"" | null = null;
+  let escaping = false;
+
+  for (const character of normalized) {
+    if (escaping) {
+      current += character;
+      escaping = false;
+      continue;
+    }
+    if (character === "\\") {
+      escaping = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) {
+        quote = null;
+      } else {
+        current += character;
+      }
+      continue;
+    }
+    if (character === "'" || character === "\"") {
+      quote = character;
+      continue;
+    }
+    if (/\s/.test(character)) {
+      if (current) {
+        result.push(current);
+        current = "";
+      }
+      continue;
+    }
+    current += character;
+  }
+  if (escaping) {
+    current += "\\";
+  }
+  if (current) {
+    result.push(current);
+  }
+  return result;
+};
+
+const getLaunchCommandOverride = (recipe: Recipe): string[] | null => {
+  const override =
+    getExtraArgument(recipe.extra_args, "launch_command") ??
+    getExtraArgument(recipe.extra_args, "custom_command");
+  if (typeof override !== "string" || !override.trim()) {
+    return null;
+  }
+  const command = splitLaunchCommand(override);
+  return command.length > 0 ? command : null;
 };
 
 /**
@@ -401,6 +468,11 @@ export const buildExllamav3Command = (recipe: Recipe, config: Config): string[] 
  * @returns Backend-specific command.
  */
 export const buildBackendCommand = (recipe: Recipe, config: Config): string[] => {
+  const launchCommand = getLaunchCommandOverride(recipe);
+  if (launchCommand) {
+    return launchCommand;
+  }
+
   if (recipe.backend === "sglang") {
     return buildSglangCommand(recipe, config);
   }
