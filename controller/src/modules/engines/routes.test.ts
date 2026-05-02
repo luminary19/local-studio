@@ -132,7 +132,6 @@ const createEngineRoutesHarness = (): {
     processManager,
     downloadManager: {} as never,
     engineService: coordinator,
-    jobManager: {} as never,
     stores: {
       recipeStore: {
         list: () => recipes,
@@ -141,7 +140,6 @@ const createEngineRoutesHarness = (): {
       downloadStore: {} as never,
       peakMetricsStore: {} as never,
       lifetimeMetricsStore: {} as never,
-      jobStore: {} as never,
       inferenceRequestStore: {} as never,
     },
   } as AppContext);

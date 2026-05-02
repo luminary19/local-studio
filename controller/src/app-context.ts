@@ -14,9 +14,7 @@ import { primaryLogPathFor } from "./core/log-files";
 import { DownloadStore } from "./modules/engines/layers/download-store";
 import { PeakMetricsStore, LifetimeMetricsStore } from "./modules/system/metrics-store";
 import { RecipeStore } from "./modules/models/recipes/recipe-store";
-import { JobStore } from "./stores/job-store";
 import { InferenceRequestStore } from "./stores/inference-request-store";
-import { JobManager } from "./modules/jobs/job-manager";
 
 /**
  * Create the application dependency container.
@@ -32,7 +30,6 @@ export const createAppContext = (): AppContext => {
   const downloadStore = new DownloadStore(dbPath);
   const peakMetricsStore = new PeakMetricsStore(dbPath);
   const lifetimeMetricsStore = new LifetimeMetricsStore(dbPath);
-  const jobStore = new JobStore(dbPath);
   const inferenceRequestStore = new InferenceRequestStore(dbPath);
   const eventManager = createEventManager();
   const logger = createLogger(resolveLogLevel("info"), {
@@ -71,15 +68,9 @@ export const createAppContext = (): AppContext => {
       downloadStore,
       peakMetricsStore,
       lifetimeMetricsStore,
-      jobStore,
       inferenceRequestStore,
     },
-  } as Omit<AppContext, "jobManager">;
+  } satisfies AppContext;
 
-  const jobManager = new JobManager(baseContext as AppContext, jobStore);
-
-  return {
-    ...baseContext,
-    jobManager,
-  };
+  return baseContext;
 };
