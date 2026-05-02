@@ -10,6 +10,7 @@ import type { DownloadStore } from "../modules/engines/layers/download-store";
 import type { LifetimeMetricsStore, PeakMetricsStore } from "../modules/system/metrics-store";
 import type { RecipeStore } from "../modules/models/recipes/recipe-store";
 import type { JobStore } from "../stores/job-store";
+import type { InferenceRequestStore } from "../stores/inference-request-store";
 import type { JobType } from "../modules/jobs/types";
 
 /**
@@ -42,5 +43,6 @@ export interface AppContext {
     peakMetricsStore: PeakMetricsStore;
     lifetimeMetricsStore: LifetimeMetricsStore;
     jobStore: JobStore;
+    inferenceRequestStore: InferenceRequestStore;
   };
 }

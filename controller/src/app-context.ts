@@ -15,6 +15,7 @@ import { DownloadStore } from "./modules/engines/layers/download-store";
 import { PeakMetricsStore, LifetimeMetricsStore } from "./modules/system/metrics-store";
 import { RecipeStore } from "./modules/models/recipes/recipe-store";
 import { JobStore } from "./stores/job-store";
+import { InferenceRequestStore } from "./stores/inference-request-store";
 import { JobManager } from "./modules/jobs/job-manager";
 
 /**
@@ -32,6 +33,7 @@ export const createAppContext = (): AppContext => {
   const peakMetricsStore = new PeakMetricsStore(dbPath);
   const lifetimeMetricsStore = new LifetimeMetricsStore(dbPath);
   const jobStore = new JobStore(dbPath);
+  const inferenceRequestStore = new InferenceRequestStore(dbPath);
   const eventManager = createEventManager();
   const logger = createLogger(resolveLogLevel("info"), {
     filePath: primaryLogPathFor(config.data_dir, "controller"),
@@ -70,6 +72,7 @@ export const createAppContext = (): AppContext => {
       peakMetricsStore,
       lifetimeMetricsStore,
       jobStore,
+      inferenceRequestStore,
     },
   } as Omit<AppContext, "jobManager">;
 
