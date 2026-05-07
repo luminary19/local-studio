@@ -57,7 +57,3 @@ export function sanitizeLocalFileUrl(raw: string): string | null {
   if (host && host !== "localhost") return null;
   return url.toString();
 }
-
-export function sanitizeEmbeddedBrowserUrl(raw: string): string | null {
-  return sanitizePublicBrowserUrl(raw) ?? sanitizeLocalFileUrl(raw);
-}
