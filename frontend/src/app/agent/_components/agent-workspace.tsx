@@ -19,8 +19,11 @@ import {
 } from "@/lib/sanitize-embedded-browser-url";
 import { ChevronDownIcon, CloseIcon, ComputerIcon, PlusIcon } from "@/components/icons";
 import { safeJson } from "@/lib/agent/safe-json";
+import type { AgentModel } from "@/lib/agent/models";
+import type { ProjectEntry } from "@/lib/agent/projects-store";
+import { makeFreshTab, newId, type SessionTab } from "@/lib/agent/chat-session";
 import { AgentBrowser, type AgentBrowserHandle, type WebviewElement } from "./agent-browser";
-import { ChatPane, makeFreshTab, type ChatPaneHandle, type SessionTab } from "./chat-pane";
+import { ChatPane, type ChatPaneHandle } from "./chat-pane";
 import { FilesystemPanel } from "./filesystem-panel";
 import { GitDiffPanel } from "./git-diff-panel";
 import { PaneGrid, type SessionDropPayload } from "./pane-grid";
@@ -32,26 +35,6 @@ import {
   type Layout,
   type PaneId,
 } from "./pane-layout";
-
-type AgentModel = {
-  id: string;
-  name: string;
-  provider: "vllm-studio";
-  contextWindow: number;
-  maxTokens: number;
-  reasoning: boolean;
-  active: boolean;
-};
-
-type ProjectEntry = {
-  id: string;
-  name: string;
-  path: string;
-  addedAt: string;
-  exists: boolean;
-  hasGit: boolean;
-  branch: string | null;
-};
 
 type GitSummary = {
   isRepo: boolean;
@@ -135,30 +118,16 @@ const ACTIVE_AGENT_SESSIONS_SNAPSHOT_KEY = "vllm-studio.agent.activeSessions.sna
 
 type ComputerTab = "browser" | "files" | "diff";
 
-function randomIdSegment(length: number): string {
-  const cryptoApi = globalThis.crypto;
-  if (cryptoApi?.randomUUID) {
-    return cryptoApi.randomUUID().replace(/-/g, "").slice(0, length);
-  }
-  const bytes = new Uint8Array(Math.ceil(length / 2));
-  if (cryptoApi?.getRandomValues) {
-    cryptoApi.getRandomValues(bytes);
-  }
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, length);
+function newPaneId(): PaneId {
+  return newId("p") as PaneId;
+}
+
+function newRuntimeId(): string {
+  return newId("rt");
 }
 
 function isSafeBrowserSelector(selector: string): boolean {
   return selector.length > 0 && selector.length <= 240 && !/[`;{}]/.test(selector);
-}
-
-function newPaneId(): PaneId {
-  return `p-${Date.now().toString(36)}-${randomIdSegment(6)}`;
-}
-
-function newRuntimeId(): string {
-  return `rt-${Date.now().toString(36)}-${randomIdSegment(6)}`;
 }
 
 type PaneState = {
@@ -379,7 +348,7 @@ export function AgentWorkspace() {
         {
           tabs: [tab],
           activeTabId: tab.id,
-          runtimeSessionId: `rt-${randomIdSegment(9)}`,
+          runtimeSessionId: newRuntimeId(),
         },
       ],
     ]);
