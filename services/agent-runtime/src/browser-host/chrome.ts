@@ -21,12 +21,29 @@ function chromeDataDir(): string {
   return path.join(os.tmpdir(), "local-studio-browser-profile");
 }
 
+function windowsChromeCandidates(): string[] {
+  const roots = [
+    process.env["ProgramFiles"] ?? "C:\\Program Files",
+    process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)",
+    process.env["LOCALAPPDATA"],
+  ].filter((root): root is string => Boolean(root));
+  const relativeBinaries = [
+    path.join("Google", "Chrome", "Application", "chrome.exe"),
+    path.join("Chromium", "Application", "chrome.exe"),
+    path.join("Microsoft", "Edge", "Application", "msedge.exe"),
+  ];
+  return roots.flatMap((root) => relativeBinaries.map((binary) => path.join(root, binary)));
+}
+
 function platformChromeCandidates(): string[] {
   if (process.platform === "darwin") {
     return [
       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
       "/Applications/Chromium.app/Contents/MacOS/Chromium",
     ];
+  }
+  if (process.platform === "win32") {
+    return windowsChromeCandidates();
   }
   // Linux (and anything else): resolve common binary names on PATH.
   return ["chromium-browser", "chromium", "google-chrome-stable", "google-chrome"]
