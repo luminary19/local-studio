@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { dirname } from "node:path";
+import { delimiter, dirname } from "node:path";
 import type { Recipe } from "../../models/types";
 import type { Backend } from "@local-studio/contracts/recipes";
 import { detectEngineFromArguments } from "../engine-spec";
@@ -22,33 +22,75 @@ export const detectBackend = (args: string[]): Backend | null => {
   return detectEngineFromArguments(args);
 };
 
-export const listProcesses = (): Array<{ pid: number; args: string[] }> => {
+export type ProcessEntry = { pid: number; ppid: number; args: string[] };
+
+export const parsePosixProcessTable = (output: string): ProcessEntry[] =>
+  output
+    .split("\n")
+    .map((line): ProcessEntry | null => {
+      const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/);
+      if (!match) return null;
+      return {
+        pid: Number(match[1]),
+        ppid: Number(match[2]),
+        args: splitCommand(match[3] ?? ""),
+      };
+    })
+    .filter((entry): entry is ProcessEntry => entry !== null && entry.pid > 0);
+
+type CimProcessRow = {
+  ProcessId?: number;
+  ParentProcessId?: number;
+  CommandLine?: string | null;
+};
+
+export const parseWindowsProcessTable = (output: string): ProcessEntry[] => {
   try {
-    const result = spawnSync("ps", ["-eo", "pid=,args="]);
-    if (result.status !== 0) {
-      return [];
-    }
-    const output = result.stdout.toString("utf-8").trim();
-    if (!output) {
-      return [];
-    }
-    return output
-      .split("\n")
-      .map((line) => {
-        const trimmed = line.trim();
-        const match = trimmed.match(/^(\d+)\s+(.*)$/);
-        if (!match) {
-          return { pid: 0, args: [] };
-        }
-        const pid = Number(match[1]);
-        const args = splitCommand(match[2] ?? "");
-        return { pid, args };
-      })
-      .filter((entry) => entry.pid > 0 && entry.args.length > 0);
+    const parsed: unknown = JSON.parse(output);
+    const rows = (Array.isArray(parsed) ? parsed : [parsed]) as CimProcessRow[];
+    return rows
+      .map((row) => ({
+        pid: Number(row.ProcessId ?? 0),
+        ppid: Number(row.ParentProcessId ?? 0),
+        args: splitCommand(row.CommandLine ?? ""),
+      }))
+      .filter((entry) => entry.pid > 0);
   } catch {
     return [];
   }
 };
+
+const WINDOWS_PROCESS_QUERY =
+  "Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,CommandLine | Select-Object ProcessId,ParentProcessId,CommandLine | ConvertTo-Json -Compress";
+
+const readWindowsProcessTable = (): ProcessEntry[] => {
+  const result = spawnSync(
+    "powershell",
+    ["-NoProfile", "-NonInteractive", "-Command", WINDOWS_PROCESS_QUERY],
+    { maxBuffer: 32 * 1024 * 1024, timeout: 15_000 },
+  );
+  if (result.status !== 0) return [];
+  return parseWindowsProcessTable(result.stdout.toString("utf-8"));
+};
+
+const readPosixProcessTable = (): ProcessEntry[] => {
+  const result = spawnSync("ps", ["-eo", "pid=,ppid=,args="]);
+  if (result.status !== 0) return [];
+  return parsePosixProcessTable(result.stdout.toString("utf-8"));
+};
+
+export const listProcessEntries = (): ProcessEntry[] => {
+  try {
+    return process.platform === "win32" ? readWindowsProcessTable() : readPosixProcessTable();
+  } catch {
+    return [];
+  }
+};
+
+export const listProcesses = (): Array<{ pid: number; args: string[] }> =>
+  listProcessEntries()
+    .filter((entry) => entry.args.length > 0)
+    .map(({ pid, args }) => ({ pid, args }));
 
 export const buildEnvironment = (
   recipe: Recipe,
@@ -59,7 +101,8 @@ export const buildEnvironment = (
 
   const venvBin = resolveVenvBinForRecipe(recipe, config?.data_dir);
   if (venvBin) {
-    env["PATH"] = `${venvBin}:${env["PATH"] ?? ""}`;
+    const pathKey = Object.keys(env).find((key) => key.toUpperCase() === "PATH") ?? "PATH";
+    env[pathKey] = `${venvBin}${delimiter}${env[pathKey] ?? ""}`;
   }
 
   const environmentVariables: Record<string, string> = {};
@@ -161,26 +204,11 @@ export const pidExists = (pid: number): boolean => {
 };
 
 export const buildProcessTree = (): Map<number, number[]> => {
-  const result = spawnSync("ps", ["-eo", "pid=,ppid="]);
-  if (result.status !== 0) {
-    return new Map();
-  }
-  const output = result.stdout.toString("utf-8").trim();
   const tree = new Map<number, number[]>();
-  if (!output) {
-    return tree;
-  }
-  for (const line of output.split("\n")) {
-    const trimmed = line.trim();
-    const match = trimmed.match(/^(\d+)\s+(\d+)$/);
-    if (!match) {
-      continue;
-    }
-    const pid = Number(match[1]);
-    const parent = Number(match[2]);
-    const children = tree.get(parent) ?? [];
+  for (const { pid, ppid } of listProcessEntries()) {
+    const children = tree.get(ppid) ?? [];
     children.push(pid);
-    tree.set(parent, children);
+    tree.set(ppid, children);
   }
   return tree;
 };
