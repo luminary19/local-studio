@@ -176,7 +176,7 @@ export const createProcessManager = (
       const action = force ? "kill" : "stop";
       const args = force ? [action, name] : [action, "--time", "2", name];
       let result = runner.runSync("docker", args);
-      if (result.status !== 0) {
+      if (result.status !== 0 && process.platform !== "win32") {
         result = runner.runSync("sudo", ["-n", "docker", ...args]);
       }
       if (result.status !== 0) {
@@ -193,9 +193,17 @@ export const createProcessManager = (
     const name = extractFlag(command.slice(dockerIndex + 2), "--name");
     if (!name) return;
     const result = runner.runSync("docker", ["rm", "-f", name]);
-    if (result.status !== 0) {
+    if (result.status !== 0 && process.platform !== "win32") {
       runner.runSync("sudo", ["-n", "docker", "rm", "-f", name]);
     }
+  };
+
+  const killFallback = (pid: number, signal: NodeJS.Signals): boolean => {
+    const result =
+      process.platform === "win32"
+        ? runner.runSync("taskkill", ["/PID", String(pid), "/T", "/F"])
+        : runner.runSync("sudo", ["-n", "kill", `-${signal}`, String(pid)]);
+    return result.status === 0;
   };
 
   const sendSignal = (pid: number, signal: NodeJS.Signals): boolean => {
@@ -203,12 +211,14 @@ export const createProcessManager = (
       process.kill(pid, signal);
       return true;
     } catch {
-      const result = runner.runSync("sudo", ["-n", "kill", `-${signal}`, String(pid)]);
-      return result.status === 0;
+      return killFallback(pid, signal);
     }
   };
 
   const listProcessTable = (): ProcessTableEntry[] => {
+    if (process.platform === "win32") {
+      return [];
+    }
     try {
       const result = runner.runSync("ps", ["-eo", "pid=,ppid=,stat=,args="]);
       if (result.status !== 0) {
