@@ -147,12 +147,28 @@ export const probeBackendRuntime = async (
   );
 };
 
+const readProcessCommandLine = async (pid: number): Promise<string | null> => {
+  const result =
+    process.platform === "win32"
+      ? await runCommandAsync(
+          "powershell",
+          [
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").CommandLine`,
+          ],
+          { timeoutMs: 15_000 },
+        )
+      : await runCommandAsync("ps", ["-p", String(pid), "-o", "args="], { timeoutMs: 3_000 });
+  if (result.status !== 0 || !result.stdout.trim()) return null;
+  return result.stdout.trim();
+};
+
 export const probeRunningProcessPython = async (pid: number): Promise<string | null> => {
-  const result = await runCommandAsync("ps", ["-p", String(pid), "-o", "args="], {
-    timeoutMs: 3_000,
-  });
-  if (result.status !== 0 || !result.stdout) return null;
-  return parseCommandPython(result.stdout.trim().split(/\s+/));
+  const commandLine = await readProcessCommandLine(pid);
+  if (!commandLine) return null;
+  return parseCommandPython(commandLine.split(/\s+/));
 };
 
 const parseLlamaVersion = (output: string): string | null => {
