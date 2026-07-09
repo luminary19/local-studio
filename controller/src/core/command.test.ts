@@ -1,4 +1,4 @@
-﻿import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -20,22 +20,28 @@ describe("resolveBinary", () => {
   let savedPath: string | undefined;
   let savedRuntimeBin: string | undefined;
   let savedSnap: string | undefined;
+  let savedHome: string | undefined;
+
+  const restoreEnv = (key: string, value: string | undefined): void => {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  };
 
   beforeEach(() => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), "resolve-binary-"));
     savedPath = process.env["PATH"];
     savedRuntimeBin = process.env["LOCAL_STUDIO_RUNTIME_BIN"];
     savedSnap = process.env["SNAP"];
+    savedHome = process.env["HOME"];
     delete process.env["LOCAL_STUDIO_RUNTIME_BIN"];
     delete process.env["SNAP"];
   });
 
   afterEach(() => {
-    process.env["PATH"] = savedPath;
-    if (savedRuntimeBin === undefined) delete process.env["LOCAL_STUDIO_RUNTIME_BIN"];
-    else process.env["LOCAL_STUDIO_RUNTIME_BIN"] = savedRuntimeBin;
-    if (savedSnap === undefined) delete process.env["SNAP"];
-    else process.env["SNAP"] = savedSnap;
+    restoreEnv("PATH", savedPath);
+    restoreEnv("LOCAL_STUDIO_RUNTIME_BIN", savedRuntimeBin);
+    restoreEnv("SNAP", savedSnap);
+    restoreEnv("HOME", savedHome);
     rmSync(temporaryDirectory, { recursive: true, force: true });
   });
 
@@ -52,6 +58,12 @@ describe("resolveBinary", () => {
     mkdirSync(toolDirectory);
     const expected = createExecutable(toolDirectory, "local-studio-test-tool");
     process.env["PATH"] = [emptyDirectory, toolDirectory].join(delimiter);
+    expect(resolveBinary("local-studio-test-tool")).toBe(expected);
+  });
+
+  test("resolves from a PATH entry wrapped in quotes", () => {
+    const expected = createExecutable(temporaryDirectory, "local-studio-test-tool");
+    process.env["PATH"] = `"${temporaryDirectory}"`;
     expect(resolveBinary("local-studio-test-tool")).toBe(expected);
   });
 
@@ -85,5 +97,24 @@ describe("resolveBinary", () => {
     process.env["LOCAL_STUDIO_RUNTIME_BIN"] = runtimeDirectory;
     process.env["PATH"] = pathDirectory;
     expect(resolveBinary("local-studio-test-tool")).toBe(expected);
+  });
+
+  test("falls back to HOME local bin after PATH", () => {
+    const homeDirectory = join(temporaryDirectory, "home");
+    const localBin = join(homeDirectory, ".local", "bin");
+    mkdirSync(localBin, { recursive: true });
+    const expected = createExecutable(localBin, "local-studio-test-tool");
+    process.env["HOME"] = homeDirectory;
+    process.env["PATH"] = join(temporaryDirectory, "does-not-exist");
+    expect(resolveBinary("local-studio-test-tool")).toBe(expected);
+  });
+
+  test("returns null for a file without the execute bit", () => {
+    if (process.platform === "win32") return;
+    const filePath = join(temporaryDirectory, "local-studio-test-tool");
+    writeFileSync(filePath, "");
+    chmodSync(filePath, 0o644);
+    process.env["PATH"] = temporaryDirectory;
+    expect(resolveBinary("local-studio-test-tool")).toBeNull();
   });
 });
