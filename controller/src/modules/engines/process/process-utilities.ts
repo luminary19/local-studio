@@ -9,7 +9,7 @@ import type { Config } from "../../../config/env";
 
 export { extractFlagUtility as extractFlag };
 
-const splitCommand = (command: string): string[] => {
+export const splitCommand = (command: string): string[] => {
   const matches = command.match(/(?:[^\s"]+|"[^"]*")+/g) ?? [];
   return matches.map((token) => token.replace(/^"|"$/g, ""));
 };
@@ -58,9 +58,12 @@ export const parseWindowsProcessTable = (output: string): ProcessEntry[] => {
 };
 
 const WINDOWS_PROCESS_QUERY =
-  "Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,CommandLine | Select-Object ProcessId,ParentProcessId,CommandLine | ConvertTo-Json -Compress";
+  "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,CommandLine | Select-Object ProcessId,ParentProcessId,CommandLine | ConvertTo-Json -Compress";
 
-const readWindowsProcessTable = (): ProcessEntry[] => {
+const WINDOWS_TABLE_CACHE_TTL_MS = 2_000;
+let windowsTableCache: { readAt: number; entries: ProcessEntry[] } | null = null;
+
+const queryWindowsProcessTable = (): ProcessEntry[] => {
   const result = spawnSync(
     "powershell",
     ["-NoProfile", "-NonInteractive", "-Command", WINDOWS_PROCESS_QUERY],
@@ -68,6 +71,16 @@ const readWindowsProcessTable = (): ProcessEntry[] => {
   );
   if (result.status !== 0) return [];
   return parseWindowsProcessTable(result.stdout.toString("utf-8"));
+};
+
+const readWindowsProcessTable = (): ProcessEntry[] => {
+  const now = Date.now();
+  if (windowsTableCache && now - windowsTableCache.readAt < WINDOWS_TABLE_CACHE_TTL_MS) {
+    return windowsTableCache.entries;
+  }
+  const entries = queryWindowsProcessTable();
+  windowsTableCache = { readAt: now, entries };
+  return entries;
 };
 
 const readPosixProcessTable = (): ProcessEntry[] => {

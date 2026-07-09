@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { resolveBinary, runCommandAsync } from "../../../core/command";
+import { splitCommand } from "../process/process-utilities";
 import { VLLM_RUNTIME_COMMAND_TIMEOUT_MS } from "../configs";
 
 export type PythonProbeBackend = "vllm" | "sglang" | "mlx";
@@ -168,7 +169,7 @@ const readProcessCommandLine = async (pid: number): Promise<string | null> => {
 export const probeRunningProcessPython = async (pid: number): Promise<string | null> => {
   const commandLine = await readProcessCommandLine(pid);
   if (!commandLine) return null;
-  return parseCommandPython(commandLine.split(/\s+/));
+  return parseCommandPython(splitCommand(commandLine));
 };
 
 const parseLlamaVersion = (output: string): string | null => {
