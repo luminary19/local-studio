@@ -76,7 +76,7 @@ flowchart TB
 Prerequisites: Bun 1.x (controller), Node.js 20+ and npm (frontend),
 Python 3.10+ on `PATH` (`uv` strongly recommended; engine installs fall back to
 pip), Git. vLLM/SGLang serving on Linux needs NVIDIA driver + CUDA; Apple
-Silicon uses the MLX backend.
+Silicon uses the MLX backend; Windows serves through llama.cpp with CUDA.
 
 Run the preflight check first (toolchain, ports, directories, network):
 
@@ -103,6 +103,24 @@ prints a warning, agent streaming may misrender. The setup wizard walks through
 choosing a models directory, installing an engine, downloading a model,
 launching it, and benchmarking. Engine installs (vLLM/SGLang/MLX) land in
 `<data dir>/runtime/venvs/<backend>-latest`.
+
+### Windows
+
+Native Windows 11 with an NVIDIA GPU is supported end to end:
+
+- Install [Git for Windows](https://gitforwindows.org) (its bundled bash runs
+  the git hooks and `npm run doctor`), Bun, Node.js 20+, and Python 3.10+.
+- The same quick-start commands work from Git Bash or PowerShell. `npm ci`
+  creates `services/node_modules` as a directory junction — no Developer Mode
+  or elevation required.
+- The models directory defaults to `%USERPROFILE%\models`; override with
+  `LOCAL_STUDIO_MODELS_DIR`.
+- Inference uses llama.cpp: the controller installs the official prebuilt CUDA
+  build (matched to your driver via `nvidia-smi`) into
+  `<data dir>/runtime/llamacpp/prebuilt` — no MSVC or CUDA toolkit needed.
+  vLLM and SGLang require Linux and are not offered on native Windows.
+- The agent's embedded browser discovers Chrome or Edge automatically; set
+  `LOCAL_STUDIO_CHROME_PATH` to pin a specific binary.
 
 ## Agent runtime
 
