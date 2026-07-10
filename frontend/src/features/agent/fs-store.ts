@@ -77,7 +77,7 @@ export function assertWorkspaceRoot(rootCwd: string): string {
 
 function resolveRealPath(candidate: string): string {
   try {
-    return realpathSync(candidate);
+    return realpathSync.native(candidate);
   } catch {
     return path.resolve(candidate);
   }
@@ -101,10 +101,10 @@ function resolveWorkspaceRoot(cwd: string): string {
 // Reject any path that escapes the project root, resolving symlinks on both the
 // root and the target so a symlink inside the root cannot point outside it.
 function ensureInside(rootCwd: string, target: string): string {
-  const realRoot = realpathSync(assertWorkspaceRoot(rootCwd));
+  const realRoot = assertWorkspaceRoot(rootCwd);
   let realTarget: string;
   try {
-    realTarget = realpathSync(target);
+    realTarget = realpathSync.native(target);
   } catch {
     // Target may not exist yet; fall back to a lexical resolution.
     realTarget = path.resolve(target);
