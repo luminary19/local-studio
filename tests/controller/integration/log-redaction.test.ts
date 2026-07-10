@@ -44,8 +44,16 @@ afterEach(() => {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
-  rmSync(tempDir, { recursive: true, force: true });
+  try {
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? "";
+    if (process.platform === "win32" && WINDOWS_LOCK_CODES.has(code)) return;
+    throw error;
+  }
 });
+
+const WINDOWS_LOCK_CODES = new Set(["EBUSY", "EPERM", "ENOTEMPTY", "EACCES"]);
 
 describe("redactLogLine", () => {
   test("redacts Authorization Bearer tokens", () => {

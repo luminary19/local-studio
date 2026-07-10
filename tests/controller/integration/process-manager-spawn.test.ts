@@ -100,12 +100,16 @@ describe("process manager launch/stop via the process seam", () => {
         "--max-num-seqs",
         "8",
       ]);
-      expect(
-        runner.invocations.some(
-          (invocation) => invocation.kind === "runSync" && invocation.command === "ps",
-        ),
-      ).toBe(true);
+
+      // Pre-launch orphan sweep consults the process table through the seam.
+      const consultedProcessTable = runner.invocations.some(
+        (invocation) => invocation.kind === "runSync" && invocation.command === "ps",
+      );
+      expect(consultedProcessTable).toBe(process.platform !== "win32");
+
       if (result.pid === null) throw new Error("Expected launched process pid");
+      // The fake pid does not exist on the host, so the stop path's
+      // pidExists() guard short-circuits to success without signalling anyone.
       await expect(manager.killProcess(result.pid, false)).resolves.toBe(true);
     },
     LAUNCH_TIMEOUT_MS,
