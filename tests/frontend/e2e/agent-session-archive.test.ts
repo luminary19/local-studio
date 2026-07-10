@@ -4,11 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-function encodeCwdForPi(cwd: string): string {
-  const normalized = path.resolve(cwd).replace(/\\+/g, "/");
-  const collapsed = normalized.replace(/^\//, "").replace(/\/+/g, "-");
-  return `--${collapsed}--`;
-}
+import { encodeCwdForPi } from "@local-studio/agent-runtime/sessions-store";
 
 async function loadSessionModules() {
   const [
@@ -21,9 +17,7 @@ async function loadSessionModules() {
   return { listArchivedSessionMetadata, listSessions, setSessionArchived };
 }
 
-const archiveTest = process.platform === "win32" ? test.skip : test;
-
-archiveTest("archived durable agent sessions are hidden by default and restorable", async () => {
+test("archived durable agent sessions are hidden by default and restorable", async () => {
   const previousPiAgentDir = process.env.PI_CODING_AGENT_DIR;
   const previousDataDir = process.env.LOCAL_STUDIO_DATA_DIR;
   const root = mkdtempSync(path.join(tmpdir(), "local-studio-session-archive-"));
