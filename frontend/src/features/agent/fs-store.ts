@@ -53,6 +53,7 @@ function isSystemRoot(real: string): boolean {
   if (SYSTEM_ROOTS.has(real)) return true;
   if (process.platform !== "win32") return false;
   const normalized = real.toLowerCase().replace(/[\\/]+$/, "");
+  if (normalized.startsWith("\\\\")) return true;
   return WINDOWS_SYSTEM_ROOT_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
@@ -63,7 +64,7 @@ export function assertWorkspaceRoot(rootCwd: string): string {
   const resolved = path.resolve(rootCwd);
   const real = (() => {
     try {
-      return realpathSync(resolved);
+      return realpathSync.native(resolved);
     } catch {
       return resolved;
     }
