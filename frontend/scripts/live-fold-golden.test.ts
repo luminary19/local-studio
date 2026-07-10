@@ -20,6 +20,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
   reduceSessionEvent,
@@ -29,7 +30,7 @@ import type { Session, SessionId } from "../src/features/agent/runtime/types";
 import { projectMessages, type ProjectedMessage } from "./replay-projection";
 
 const goldenPath = join(
-  new URL("./fixtures/", import.meta.url).pathname,
+  fileURLToPath(new URL("./fixtures/", import.meta.url)),
   "live-fold-turn.golden.json",
 );
 
@@ -117,11 +118,19 @@ function liveToolTurnEvents(): Record<string, unknown>[] {
     },
     {
       type: "message_update",
-      message: call1([firstThinking, firstText, { type: "toolCall", id: "live-call-1", name: "read_file", arguments: {} }]),
+      message: call1([
+        firstThinking,
+        firstText,
+        { type: "toolCall", id: "live-call-1", name: "read_file", arguments: {} },
+      ]),
       assistantMessageEvent: {
         type: "toolcall_start",
         contentIndex: 2,
-        partial: call1([firstThinking, firstText, { type: "toolCall", id: "live-call-1", name: "read_file", arguments: {} }]),
+        partial: call1([
+          firstThinking,
+          firstText,
+          { type: "toolCall", id: "live-call-1", name: "read_file", arguments: {} },
+        ]),
       },
     },
     {
