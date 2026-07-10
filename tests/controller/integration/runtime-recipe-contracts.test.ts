@@ -512,7 +512,7 @@ describe("controller route contracts", () => {
     );
     expect(target).toMatchObject({
       backend: "llamacpp",
-      kind: process.platform === "win32" ? "system" : "binary",
+      kind: "binary",
       source: "configured",
       installed: true,
       active: false,
