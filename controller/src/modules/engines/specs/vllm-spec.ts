@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { venvConsoleScriptPath } from "../runtimes/managed-venv";
 import type { Config } from "../../../config/env";
 import { resolveBinary } from "../../../core/command";
 import type { ProcessInfo, Recipe } from "../../models/types";
@@ -84,7 +84,7 @@ const buildVllmCommand = (recipe: Recipe, config: Config): string[] => {
     command = [CONTAINER_VLLM_BIN, "serve"];
     usesServe = true;
   } else if (pythonPath) {
-    const vllmBin = join(dirname(pythonPath), "vllm");
+    const vllmBin = venvConsoleScriptPath(pythonPath, "vllm");
     if (existsSync(vllmBin)) {
       command = [vllmBin, "serve"];
       usesServe = true;
