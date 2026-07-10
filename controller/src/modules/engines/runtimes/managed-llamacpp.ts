@@ -52,7 +52,7 @@ const findNvcc = (): string | null => {
   return existsSync("/usr/local/cuda/bin/nvcc") ? "/usr/local/cuda/bin/nvcc" : null;
 };
 
-export type ReleaseAsset = { name: string; browser_download_url: string };
+export type ReleaseAsset = { name: string; browser_download_url: string; digest?: string };
 
 export const assetCudaVersion = (name: string): number => {
   const match = name.match(/cuda-(\d+)(?:\.(\d+))?/);
@@ -103,6 +103,18 @@ const fetchLatestReleaseAssets = async (): Promise<ReleaseAsset[]> => {
   return release.assets ?? [];
 };
 
+const verifyAssetDigest = async (filePath: string, asset: ReleaseAsset): Promise<void> => {
+  const expected = asset.digest?.startsWith("sha256:")
+    ? asset.digest.slice("sha256:".length)
+    : null;
+  if (!expected) return;
+  const hasher = new Bun.CryptoHasher("sha256");
+  hasher.update(await Bun.file(filePath).arrayBuffer());
+  if (hasher.digest("hex") !== expected) {
+    throw new Error(`Checksum mismatch for ${asset.name}`);
+  }
+};
+
 const downloadReleaseAsset = async (asset: ReleaseAsset, directory: string): Promise<string> => {
   const response = await fetch(asset.browser_download_url, {
     signal: AbortSignal.timeout(MANAGED_BUILD_TIMEOUT_MS),
@@ -110,6 +122,7 @@ const downloadReleaseAsset = async (asset: ReleaseAsset, directory: string): Pro
   if (!response.ok) throw new Error(`Download failed for ${asset.name}: HTTP ${response.status}`);
   const filePath = join(directory, asset.name);
   await Bun.write(filePath, response);
+  await verifyAssetDigest(filePath, asset);
   return filePath;
 };
 
@@ -130,7 +143,13 @@ const installPrebuiltWindowsLlamacpp = async (
   const root = managedLlamacppRoot(options.config);
   const downloadDirectory = join(root, "downloads");
   const stagingDirectory = join(root, "prebuilt-staging");
+  const retiredDirectory = join(root, "prebuilt-old");
   const prebuiltDirectory = managedPrebuiltRoot(options.config);
+  try {
+    rmSync(retiredDirectory, { recursive: true, force: true });
+  } catch {
+    return prebuiltFailure(`A previous install is still running; stop it and retry (${retiredDirectory} is locked)`);
+  }
 
   try {
     const assets = await fetchLatestReleaseAssets();
@@ -171,15 +190,24 @@ const installPrebuiltWindowsLlamacpp = async (
       return prebuiltFailure(`Extraction finished but llama-server.exe was not found in ${stagingDirectory}`);
     }
 
-    rmSync(prebuiltDirectory, { recursive: true, force: true });
+    if (existsSync(prebuiltDirectory)) renameSync(prebuiltDirectory, retiredDirectory);
     renameSync(stagingDirectory, prebuiltDirectory);
+    try {
+      rmSync(retiredDirectory, { recursive: true, force: true });
+    } catch {
+      void 0;
+    }
 
     const binary = managedLlamaServerPath(options.config);
     const version = await runCommandAsync(binary, ["--version"], { timeoutMs: 60_000 });
+    if (version.status !== 0) {
+      return prebuiltFailure(
+        `Installed binary failed to run: ${(version.stderr || version.stdout).trim() || "unknown error"}`,
+      );
+    }
     return {
       success: true,
-      version:
-        version.status === 0 ? (version.stdout || version.stderr).trim() || null : null,
+      version: (version.stdout || version.stderr).trim() || null,
       output: `Installed ${serverAsset.name} at ${binary}`,
       error: null,
       used_command: "windows prebuilt install",
