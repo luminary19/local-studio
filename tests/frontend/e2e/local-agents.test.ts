@@ -148,7 +148,7 @@ test("pi: creates models.json with a local-studio provider when only ~/.pi exist
 
   const configPath = path.join(home, ".pi", "agent", "models.json");
   assert.equal(result.configPath, configPath);
-  assert.equal(statSync(configPath).mode & 0o777, 0o600);
+  assert.equal(statSync(configPath).mode & 0o777, process.platform === "win32" ? 0o666 : 0o600);
 
   const written = readJson(configPath);
   const provider = written.providers["local-studio"];

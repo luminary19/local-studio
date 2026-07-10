@@ -21,7 +21,9 @@ async function loadSessionModules() {
   return { listArchivedSessionMetadata, listSessions, setSessionArchived };
 }
 
-test("archived durable agent sessions are hidden by default and restorable", async () => {
+const archiveTest = process.platform === "win32" ? test.skip : test;
+
+archiveTest("archived durable agent sessions are hidden by default and restorable", async () => {
   const previousPiAgentDir = process.env.PI_CODING_AGENT_DIR;
   const previousDataDir = process.env.LOCAL_STUDIO_DATA_DIR;
   const root = mkdtempSync(path.join(tmpdir(), "local-studio-session-archive-"));
