@@ -1,7 +1,5 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import type { Config } from "../../../config/env";
-import { resolveBinary, runCommandAsync } from "../../../core/command";
+import { runCommandAsync } from "../../../core/command";
 import { LLAMACPP_HELP_TIMEOUT_MS } from "../configs";
 import type { ProcessInfo, Recipe } from "../../models/types";
 import type {
@@ -22,7 +20,10 @@ import {
   LLAMACPP_UPGRADE_ENV,
   runEnvironmentUpgradeCommand,
 } from "../runtimes/upgrade-config";
-import { installManagedLlamacpp } from "../runtimes/managed-llamacpp";
+import {
+  installManagedLlamacpp,
+  resolveLlamaServerHelpBinary,
+} from "../runtimes/managed-llamacpp";
 
 export const buildLlamacppRecipeArguments = (recipe: Recipe): string[] => {
   const command: string[] = [];
@@ -75,10 +76,7 @@ const getRuntimeInfoAsync = async (
 };
 
 const getConfigHelp = async (config: Config): Promise<ConfigHelpResult> => {
-  const configured = config.llama_bin || "llama-server";
-  const resolved =
-    resolveBinary(configured) ?? (existsSync(configured) ? resolve(configured) : null);
-  const binary = resolved ?? configured;
+  const binary = resolveLlamaServerHelpBinary(config);
   const result = await runCommandAsync(binary, ["--help"], {
     timeoutMs: LLAMACPP_HELP_TIMEOUT_MS,
   });
