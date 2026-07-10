@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -9,6 +8,7 @@ import {
   registerControllerTestLifecycle,
   tempDir,
 } from "./fixtures";
+import { writeFakeExecutable } from "../../support/controller/fake-executable";
 
 registerControllerTestLifecycle();
 
@@ -454,9 +454,8 @@ describe("controller route contracts", () => {
   });
 
   test("runtime target selection and health routes persist observable outcomes", async () => {
-    const llamaBin = join(tempDir, "llama-server-test");
-    writeFileSync(
-      llamaBin,
+    const llamaBin = writeFakeExecutable(
+      join(tempDir, "llama-server-test"),
       [
         "#!/usr/bin/env sh",
         'if [ "$1" = "--version" ]; then echo \'llama-server test runtime\'; exit 0; fi',
@@ -464,13 +463,14 @@ describe("controller route contracts", () => {
         "exit 0",
         "",
       ].join("\n"),
-      "utf8",
+      [
+        { when: ["--version"], echo: "llama-server test runtime" },
+        { when: ["--help"], echo: "usage: llama-server-test" },
+      ],
     );
-    chmodSync(llamaBin, 0o755);
     process.env.LOCAL_STUDIO_LLAMA_BIN = llamaBin;
-    const sglangPython = join(tempDir, "python-sglang-test");
-    writeFileSync(
-      sglangPython,
+    const sglangPython = writeFakeExecutable(
+      join(tempDir, "python-sglang-test"),
       [
         "#!/usr/bin/env sh",
         'if [ "$1" = "--version" ] || [ "$1" = "-V" ]; then echo \'Python 3.12.0\'; exit 0; fi',
@@ -478,13 +478,14 @@ describe("controller route contracts", () => {
         "exit 0",
         "",
       ].join("\n"),
-      "utf8",
+      [
+        { when: ["--version", "-V"], echo: "Python 3.12.0" },
+        { when: ["-c"], echo: '{"version":"0.4.0"}' },
+      ],
     );
-    chmodSync(sglangPython, 0o755);
     process.env.LOCAL_STUDIO_SGLANG_PYTHON = sglangPython;
-    const mlxPython = join(tempDir, "python-mlx-test");
-    writeFileSync(
-      mlxPython,
+    const mlxPython = writeFakeExecutable(
+      join(tempDir, "python-mlx-test"),
       [
         "#!/usr/bin/env sh",
         'if [ "$1" = "--version" ]; then echo \'Python 3.12.0\'; exit 0; fi',
@@ -492,9 +493,11 @@ describe("controller route contracts", () => {
         "exit 0",
         "",
       ].join("\n"),
-      "utf8",
+      [
+        { when: ["--version"], echo: "Python 3.12.0" },
+        { when: ["-c"], echo: '{"version":"0.24.0"}' },
+      ],
     );
-    chmodSync(mlxPython, 0o755);
     process.env.LOCAL_STUDIO_MLX_PYTHON = mlxPython;
     const app = await createTestApp();
 
@@ -509,7 +512,7 @@ describe("controller route contracts", () => {
     );
     expect(target).toMatchObject({
       backend: "llamacpp",
-      kind: "binary",
+      kind: process.platform === "win32" ? "system" : "binary",
       source: "configured",
       installed: true,
       active: false,

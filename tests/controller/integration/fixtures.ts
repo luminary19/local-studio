@@ -74,8 +74,20 @@ export function registerControllerTestLifecycle() {
       else process.env[key] = value;
     }
     await delay(50);
-    rmSync(tempDir, { recursive: true, force: true });
+    removeTempDir(tempDir);
   });
+}
+
+const WINDOWS_LOCK_CODES = new Set(["EBUSY", "EPERM", "ENOTEMPTY", "EACCES"]);
+
+function removeTempDir(dir: string): void {
+  try {
+    rmSync(dir, { recursive: true, force: true });
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? "";
+    if (process.platform === "win32" && WINDOWS_LOCK_CODES.has(code)) return;
+    throw error;
+  }
 }
 
 export async function createTestApp() {
