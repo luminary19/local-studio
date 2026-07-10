@@ -84,6 +84,7 @@ mac:
   entitlementsInherit: desktop/resources/entitlements.mac.plist
 
 win:
+  icon: desktop/resources/icon.ico
   target:
     - target: nsis
       arch:
