@@ -93,6 +93,20 @@ describe("managedLlamaServerPath", () => {
 });
 
 describe("resolveLlamaServerHelpBinary", () => {
+  const neverOnPath = (): string | null => null;
+
+  test("prefers a PATH hit for the bare command", () => {
+    const dataDirectory = mkdtempSync(join(tmpdir(), "managed-llamacpp-help-"));
+    try {
+      const onPath = join(dataDirectory, "path", "llama-server");
+      expect(
+        resolveLlamaServerHelpBinary({ data_dir: dataDirectory, llama_bin: "" }, () => onPath),
+      ).toBe(onPath);
+    } finally {
+      rmSync(dataDirectory, { recursive: true, force: true });
+    }
+  });
+
   test("falls back to the managed install when llama_bin is unset", () => {
     const dataDirectory = mkdtempSync(join(tmpdir(), "managed-llamacpp-help-"));
     try {
@@ -100,7 +114,21 @@ describe("resolveLlamaServerHelpBinary", () => {
       mkdirSync(dirname(managed), { recursive: true });
       writeFileSync(managed, "");
       expect(
-        resolveLlamaServerHelpBinary({ data_dir: dataDirectory, llama_bin: "" }),
+        resolveLlamaServerHelpBinary({ data_dir: dataDirectory, llama_bin: "" }, neverOnPath),
+      ).toBe(managed);
+    } finally {
+      rmSync(dataDirectory, { recursive: true, force: true });
+    }
+  });
+
+  test("treats whitespace-only llama_bin as unset", () => {
+    const dataDirectory = mkdtempSync(join(tmpdir(), "managed-llamacpp-help-"));
+    try {
+      const managed = managedLlamaServerPath({ data_dir: dataDirectory });
+      mkdirSync(dirname(managed), { recursive: true });
+      writeFileSync(managed, "");
+      expect(
+        resolveLlamaServerHelpBinary({ data_dir: dataDirectory, llama_bin: "   " }, neverOnPath),
       ).toBe(managed);
     } finally {
       rmSync(dataDirectory, { recursive: true, force: true });
@@ -111,7 +139,7 @@ describe("resolveLlamaServerHelpBinary", () => {
     const dataDirectory = mkdtempSync(join(tmpdir(), "managed-llamacpp-help-"));
     try {
       expect(
-        resolveLlamaServerHelpBinary({ data_dir: dataDirectory, llama_bin: "" }),
+        resolveLlamaServerHelpBinary({ data_dir: dataDirectory, llama_bin: "" }, neverOnPath),
       ).toBe("llama-server");
     } finally {
       rmSync(dataDirectory, { recursive: true, force: true });
@@ -127,8 +155,29 @@ describe("resolveLlamaServerHelpBinary", () => {
       mkdirSync(dirname(managed), { recursive: true });
       writeFileSync(managed, "");
       expect(
-        resolveLlamaServerHelpBinary({ data_dir: dataDirectory, llama_bin: configured }),
+        resolveLlamaServerHelpBinary(
+          { data_dir: dataDirectory, llama_bin: configured },
+          neverOnPath,
+        ),
       ).toBe(resolve(configured));
+    } finally {
+      rmSync(dataDirectory, { recursive: true, force: true });
+    }
+  });
+
+  test("surfaces a missing explicit llama_bin instead of falling back", () => {
+    const dataDirectory = mkdtempSync(join(tmpdir(), "managed-llamacpp-help-"));
+    try {
+      const configured = join(dataDirectory, "missing-llama-server");
+      const managed = managedLlamaServerPath({ data_dir: dataDirectory });
+      mkdirSync(dirname(managed), { recursive: true });
+      writeFileSync(managed, "");
+      expect(
+        resolveLlamaServerHelpBinary(
+          { data_dir: dataDirectory, llama_bin: configured },
+          neverOnPath,
+        ),
+      ).toBe(configured);
     } finally {
       rmSync(dataDirectory, { recursive: true, force: true });
     }
