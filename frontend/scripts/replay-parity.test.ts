@@ -18,12 +18,13 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { foldSessionEvents } from "../src/features/agent/runtime/pi-event-applier";
 import { usageFromEvent, type TokenStats } from "../src/features/agent/messages";
 import { projectReplayResult, type ProjectedReplay } from "./replay-projection";
 
-const fixturesDir = new URL("./fixtures/", import.meta.url).pathname;
+const fixturesDir = fileURLToPath(new URL("./fixtures/", import.meta.url));
 const goldenPath = join(fixturesDir, "replay-canonical-session.golden.json");
 
 function parseJsonl(raw: string): Record<string, unknown>[] {
@@ -90,7 +91,9 @@ function legacyIsSuccessfulCompactionBoundary(
 const stableJson = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
 
 test("foldSessionEvents over the sanitized canonical fixture matches the checked-in golden", () => {
-  const events = parseJsonl(readFileSync(join(fixturesDir, "replay-canonical-session.jsonl"), "utf8"));
+  const events = parseJsonl(
+    readFileSync(join(fixturesDir, "replay-canonical-session.jsonl"), "utf8"),
+  );
   const projection = replayProjection(events);
 
   if (process.env.UPDATE_GOLDENS) {
@@ -101,12 +104,16 @@ test("foldSessionEvents over the sanitized canonical fixture matches the checked
 });
 
 test("fold tokenStats equals the legacy loadAndReplay scan over the fixture", () => {
-  const events = parseJsonl(readFileSync(join(fixturesDir, "replay-canonical-session.jsonl"), "utf8"));
+  const events = parseJsonl(
+    readFileSync(join(fixturesDir, "replay-canonical-session.jsonl"), "utf8"),
+  );
   assert.deepEqual(foldSessionEvents(events).tokenStats ?? null, legacyTokenStats(events));
 });
 
 test("replay projection is deterministic across runs (no wall-clock leakage)", () => {
-  const events = parseJsonl(readFileSync(join(fixturesDir, "replay-canonical-session.jsonl"), "utf8"));
+  const events = parseJsonl(
+    readFileSync(join(fixturesDir, "replay-canonical-session.jsonl"), "utf8"),
+  );
   assert.deepEqual(replayProjection(events), replayProjection(events));
 });
 
@@ -176,7 +183,7 @@ test(
       );
       compared += 1;
     }
-    // eslint-disable-next-line no-console
+
     console.log(`parity sweep: ${compared} compared, ${recorded} newly recorded`);
   },
 );
