@@ -46,7 +46,7 @@ test("settings persistence saves controller, voice, and API key settings securel
     voiceUrl: "https://voice.local:9000",
     voiceModel: "whisper-large-v3",
   });
-  assert.equal(statSync(savedPath).mode & 0o777, 0o600);
+  assert.equal(statSync(savedPath).mode & 0o777, process.platform === "win32" ? 0o666 : 0o600);
 
   assert.deepEqual(await getApiSettings(), {
     backendUrl: "https://controller.local:8080",
