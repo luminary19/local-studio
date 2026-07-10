@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import type { Config } from "../../../config/env";
 import { resolveBinary, runCommandAsync } from "../../../core/command";
 import type { RuntimeUpgradeResult } from "@local-studio/contracts/system";
+import { extractCudaVersion } from "./cuda-version";
 import type { InstallOptions } from "../engine-spec";
 
 const LLAMACPP_REPO = "https://github.com/ggml-org/llama.cpp";
@@ -61,8 +62,8 @@ export const assetCudaVersion = (name: string): number => {
 };
 
 export const parseDriverCudaVersion = (output: string): number | null => {
-  const match = output.match(/CUDA (?:UMD )?Version:\s*([\d.]+)/);
-  return match?.[1] ? Number.parseFloat(match[1]) : null;
+  const version = extractCudaVersion(output);
+  return version ? Number.parseFloat(version) : null;
 };
 
 const detectDriverCudaVersion = async (): Promise<number | null> => {
