@@ -40,6 +40,22 @@ const SYSTEM_ROOTS = new Set([
   "/var",
 ]);
 
+const WINDOWS_SYSTEM_ROOT_PATTERNS = [
+  /^[a-z]:\\windows$/,
+  /^[a-z]:\\program files$/,
+  /^[a-z]:\\program files \(x86\)$/,
+  /^[a-z]:\\programdata$/,
+  /^[a-z]:\\users$/,
+  /^[a-z]:\\\$recycle\.bin$/,
+];
+
+function isSystemRoot(real: string): boolean {
+  if (SYSTEM_ROOTS.has(real)) return true;
+  if (process.platform !== "win32") return false;
+  const normalized = real.toLowerCase().replace(/[\\/]+$/, "");
+  return WINDOWS_SYSTEM_ROOT_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
 // Reject the filesystem root and system directories as workspace roots. Returns
 // the symlink-resolved absolute path. Used by the filesystem and terminal
 // routes before any read/list/exec against a caller-supplied cwd.
@@ -52,7 +68,7 @@ export function assertWorkspaceRoot(rootCwd: string): string {
       return resolved;
     }
   })();
-  if (SYSTEM_ROOTS.has(real) || real === path.parse(real).root) {
+  if (isSystemRoot(real) || real === path.parse(real).root) {
     throw new Error("Path is not an allowed workspace root");
   }
   return real;
