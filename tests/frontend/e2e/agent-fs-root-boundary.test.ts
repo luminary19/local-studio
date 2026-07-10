@@ -156,7 +156,7 @@ describe("agent filesystem root boundary", () => {
       assert.deepEqual(names, ["file.txt", "sub"]);
     } finally {
       removeProjectFromStore(projectId);
-      if (existsSync(linkRoot)) rmSync(linkRoot);
+      if (existsSync(linkRoot)) rmSync(linkRoot, { recursive: true, force: true });
     }
   });
 });
