@@ -87,11 +87,10 @@ describe("process manager launch/stop via the process seam", () => {
       ]);
 
       // Pre-launch orphan sweep consults the process table through the seam.
-      expect(
-        runner.invocations.some(
-          (invocation) => invocation.kind === "runSync" && invocation.command === "ps",
-        ),
-      ).toBe(true);
+      const consultedProcessTable = runner.invocations.some(
+        (invocation) => invocation.kind === "runSync" && invocation.command === "ps",
+      );
+      expect(consultedProcessTable).toBe(process.platform !== "win32");
 
       // The fake pid does not exist on the host, so the stop path's
       // pidExists() guard short-circuits to success without signalling anyone.
