@@ -32,7 +32,10 @@ export type FakeSpawnBehavior = {
 
 const matches = (matcher: CommandMatcher, command: string, args: string[]): boolean => {
   if (typeof matcher === "function") return matcher(command, args);
-  return command === matcher || command.endsWith(`/${matcher}`);
+  if (command === matcher) return true;
+  // Match a bare name against any path shape ("/opt/bin/vllm", "C:\bin\vllm.exe").
+  const base = command.split(/[/\\]/).at(-1) ?? "";
+  return base === matcher || base.toLowerCase() === `${matcher.toLowerCase()}.exe`;
 };
 
 class FakeSpawnedProcess implements SpawnedProcess {

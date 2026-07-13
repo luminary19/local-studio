@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { createConfig } from "../../../controller/src/config/env";
 import { createLogger } from "../../../controller/src/core/logger";
 import { createProcessManager } from "../../../controller/src/modules/engines/process/process-manager";
@@ -12,8 +12,11 @@ registerControllerTestLifecycle();
 
 const LAUNCH_TIMEOUT_MS = 10_000;
 
+// Windows binaries need a PATHEXT extension to resolve.
+const vllmBinaryName = process.platform === "win32" ? "vllm.exe" : "vllm";
+
 const testVllmBinary = (): string => {
-  const binary = join(tempDir, "bin", "vllm");
+  const binary = join(tempDir, "bin", vllmBinaryName);
   mkdirSync(join(tempDir, "bin"), { recursive: true });
   writeFileSync(binary, "");
   chmodSync(binary, 0o755);
@@ -83,7 +86,7 @@ describe("process manager launch/stop via the process seam", () => {
       expect(result.log_file).toBe(join(config.data_dir, "logs", "vllm_vllm-argv.log"));
 
       const spawn = onlySpawn(runner);
-      expect(spawn.command.split("/").at(-1)).toBe("vllm");
+      expect(basename(spawn.command)).toBe(vllmBinaryName);
       expect(spawn.args).toEqual([
         "serve",
         recipe.model_path,
@@ -239,7 +242,11 @@ describe("process manager launch/stop via the process seam", () => {
     }
   });
 
-  test("stop confirmation cleans and retains known orphan workers", async () => {
+  // The orphan sweep matches POSIX reparenting (ppid 1) via `ps` and does not
+  // exist on Windows, where listProcessTable() intentionally returns [].
+  test.skipIf(process.platform === "win32")(
+    "stop confirmation cleans and retains known orphan workers",
+    async () => {
     const pid = 2_147_483_000;
     const runner = new FakeProcessRunner().onRunSync(
       (command, args) => command === "ps" && args.includes("pid=,ppid=,stat=,args="),
@@ -253,7 +260,8 @@ describe("process manager launch/stop via the process seam", () => {
       command: "sudo",
       args: ["-n", "kill", "-SIGTERM", String(pid)],
     });
-  });
+    },
+  );
 
   test(
     "a fast-failing launch surfaces the exit code and captured output",
