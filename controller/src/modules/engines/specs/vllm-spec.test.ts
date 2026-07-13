@@ -5,7 +5,11 @@ import { tmpdir } from "node:os";
 import type { Config } from "../../../config/env";
 import { parseRecipe } from "../../models/recipes/recipe-serializer";
 import type { Recipe } from "../../models/types";
+import { venvPythonPath } from "../runtimes/managed-venv";
 import { vllmSpec } from "../engine-spec";
+
+const binaryName = (name: string): string =>
+  process.platform === "win32" ? `${name}.exe` : name;
 
 const temporaryDirectories: string[] = [];
 
@@ -52,7 +56,7 @@ describe("buildVllmCommand runtime selection", () => {
   test("launches the selected managed venv", () => {
     const dataDirectory = temporaryDirectory();
     const python = executable(
-      join(dataDirectory, "runtime", "venvs", "vllm-latest", "bin", "python"),
+      venvPythonPath(join(dataDirectory, "runtime", "venvs", "vllm-latest")),
     );
     expect(
       vllmSpec
@@ -63,7 +67,7 @@ describe("buildVllmCommand runtime selection", () => {
 
   test("launches the selected system binary", () => {
     const dataDirectory = temporaryDirectory();
-    const binary = executable(join(dataDirectory, "bin", "vllm"));
+    const binary = executable(join(dataDirectory, "bin", binaryName("vllm")));
     expect(
       vllmSpec
         .buildCommand(recipe({ kind: "system", ref: binary }), config(dataDirectory))

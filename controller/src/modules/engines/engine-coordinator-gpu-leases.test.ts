@@ -13,6 +13,20 @@ import type { GpuInfo, Recipe } from "../models/types";
 import { EventManager } from "../system/event-manager";
 import { createGpuLeaseRegistry } from "../system/gpu-leases";
 
+// Windows cannot delete the still-open SQLite database inside the temp dir;
+// tolerate lock errors there like tests/controller/integration/fixtures.ts does.
+const WINDOWS_LOCK_CODES = new Set(["EBUSY", "EPERM", "ENOTEMPTY", "EACCES"]);
+
+const removeTemporaryDirectory = (dir: string): void => {
+  try {
+    rmSync(dir, { recursive: true, force: true });
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? "";
+    if (process.platform === "win32" && WINDOWS_LOCK_CODES.has(code)) return;
+    throw error;
+  }
+};
+
 const proUuids = [
   "GPU-00000000-0000-0000-0000-000000000001",
   "GPU-00000000-0000-0000-0000-000000000002",
@@ -110,7 +124,7 @@ test("blocks an all-GPU model before launch while speech owns the 3090", async (
     });
     expect(launches).toBe(0);
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    removeTemporaryDirectory(directory);
   }
 });
 
@@ -139,7 +153,7 @@ test("launches a four-PRO recipe without releasing the speech lease", async () =
       { uuid: speechUuid, owner: "speech" },
     ]);
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    removeTemporaryDirectory(directory);
   }
 });
 
@@ -176,7 +190,7 @@ test("clears a stopped model lease before a conflicting replacement returns", as
       { uuid: speechUuid, owner: "speech" },
     ]);
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    removeTemporaryDirectory(directory);
   }
 });
 
@@ -213,7 +227,7 @@ test("releases the exact model lease when a ready process later dies", async () 
     expect(await Effect.runPromise(registry.snapshot())).toEqual([]);
   } finally {
     alive = false;
-    rmSync(directory, { recursive: true, force: true });
+    removeTemporaryDirectory(directory);
   }
 });
 
@@ -263,7 +277,7 @@ test("an interrupted old monitor cannot release a replacement model lease", asyn
   } finally {
     alive.set(9102, false);
     await Effect.runPromise(Effect.sleep(10));
-    rmSync(directory, { recursive: true, force: true });
+    removeTemporaryDirectory(directory);
   }
 });
 
@@ -287,7 +301,7 @@ test("rejects unresolved selectors before launch", async () => {
     expect(result).toEqual({ ok: false, error: "Cannot resolve GPU selectors: GPU-00000000" });
     expect(launches).toBe(0);
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    removeTemporaryDirectory(directory);
   }
 });
 
@@ -315,7 +329,7 @@ test("rejects an implicit all-GPU launch without telemetry", async () => {
     });
     expect(launches).toBe(0);
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    removeTemporaryDirectory(directory);
   }
 });
 
@@ -340,7 +354,7 @@ test("allows an implicit non-NVIDIA launch without NVIDIA telemetry", async () =
     expect(result).toEqual({ ok: false, error: "test stop" });
     expect(launches).toBe(1);
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    removeTemporaryDirectory(directory);
   }
 });
 
@@ -364,7 +378,7 @@ test("keeps an explicit empty selector GPU-free without telemetry", async () => 
     expect(result).toEqual({ ok: false, error: "test stop" });
     expect(launchOptions).toEqual({ gpuUuids: [] });
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    removeTemporaryDirectory(directory);
   }
 });
 
@@ -402,6 +416,6 @@ test("retains the model lease until cleanup is confirmed", async () => {
     expect(await Effect.runPromise(registry.snapshot())).toEqual([]);
   } finally {
     alive = false;
-    rmSync(directory, { recursive: true, force: true });
+    removeTemporaryDirectory(directory);
   }
 });

@@ -5,9 +5,45 @@ import { join } from "node:path";
 import type { GpuInfo } from "../../models/types";
 import { queryNvidiaSmiSnapshot } from "./gpu";
 
+const SNAPSHOT_CSV_LINE =
+  "GPU-3090, 00000000:82:00.0, NVIDIA GeForce RTX 3090, 24576, 2048, 22528, 12, 48, 80.5, 350, 580.95.05";
+
+// Fake nvidia-smi that records its argv and prints one CSV row. Windows cannot
+// execute a shell script, so it gets a .cmd shim that forwards to a JS fake run
+// by the current bun executable (argv survives verbatim: no spaces in the args).
+const writeFakeNvidiaSmi = (directory: string): string => {
+  if (process.platform === "win32") {
+    const scriptPath = join(directory, "fake-nvidia-smi.mjs");
+    writeFileSync(
+      scriptPath,
+      [
+        'import { appendFileSync, writeFileSync } from "node:fs";',
+        "const args = process.argv.slice(2);",
+        'writeFileSync(process.env["LOCAL_STUDIO_NVIDIA_SMI_ARGUMENTS_PATH"], `${args.join("\\n")}\\n`);',
+        'appendFileSync(process.env["LOCAL_STUDIO_NVIDIA_SMI_COUNT_PATH"], "1\\n");',
+        `console.log(${JSON.stringify(SNAPSHOT_CSV_LINE)});`,
+      ].join("\n"),
+    );
+    const binaryPath = join(directory, "nvidia-smi.cmd");
+    writeFileSync(binaryPath, `@echo off\r\n"${process.execPath}" "${scriptPath}" %*\r\n`);
+    return binaryPath;
+  }
+  const binaryPath = join(directory, "nvidia-smi");
+  writeFileSync(
+    binaryPath,
+    [
+      "#!/bin/sh",
+      'printf \'%s\\n\' "$@" > "$LOCAL_STUDIO_NVIDIA_SMI_ARGUMENTS_PATH"',
+      "printf '1\\n' >> \"$LOCAL_STUDIO_NVIDIA_SMI_COUNT_PATH\"",
+      `printf '%s\\n' '${SNAPSHOT_CSV_LINE}'`,
+    ].join("\n"),
+  );
+  chmodSync(binaryPath, 0o755);
+  return binaryPath;
+};
+
 test("collects stable NVIDIA identities from one shared snapshot", async () => {
   const directory = mkdtempSync(join(tmpdir(), "local-studio-nvidia-smi-"));
-  const binaryPath = join(directory, "nvidia-smi");
   const argumentsPath = join(directory, "arguments");
   const countPath = join(directory, "count");
   const previousBinary = process.env["NVIDIA_SMI_PATH"];
@@ -15,17 +51,7 @@ test("collects stable NVIDIA identities from one shared snapshot", async () => {
   const previousCountPath = process.env["LOCAL_STUDIO_NVIDIA_SMI_COUNT_PATH"];
 
   try {
-    writeFileSync(
-      binaryPath,
-      [
-        "#!/bin/sh",
-        'printf \'%s\\n\' "$@" > "$LOCAL_STUDIO_NVIDIA_SMI_ARGUMENTS_PATH"',
-        "printf '1\\n' >> \"$LOCAL_STUDIO_NVIDIA_SMI_COUNT_PATH\"",
-        "printf '%s\\n' 'GPU-3090, 00000000:82:00.0, NVIDIA GeForce RTX 3090, 24576, 2048, 22528, 12, 48, 80.5, 350, 580.95.05'",
-      ].join("\n"),
-    );
-    chmodSync(binaryPath, 0o755);
-    process.env["NVIDIA_SMI_PATH"] = binaryPath;
+    process.env["NVIDIA_SMI_PATH"] = writeFakeNvidiaSmi(directory);
     process.env["LOCAL_STUDIO_NVIDIA_SMI_ARGUMENTS_PATH"] = argumentsPath;
     process.env["LOCAL_STUDIO_NVIDIA_SMI_COUNT_PATH"] = countPath;
 

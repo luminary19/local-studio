@@ -239,11 +239,14 @@ test("secures speech storage and removes only owned orphan plaintext", () => {
 
     expect(readdirSync(uploads)).toEqual([]);
     expect(readdirSync(outputs)).toEqual(["preserve.wav"]);
-    expect(statSync(runtime.paths.speechDirectory).mode & 0o777).toBe(0o700);
-    expect(statSync(runtime.paths.cacheDirectory).mode & 0o777).toBe(0o700);
-    expect(statSync(runtime.paths.voiceDirectory).mode & 0o777).toBe(0o700);
-    expect(statSync(runtime.paths.outputDirectory).mode & 0o777).toBe(0o700);
-    expect(statSync(runtime.paths.uploadDirectory).mode & 0o777).toBe(0o700);
+    // POSIX permission bits are not representable on Windows.
+    if (process.platform !== "win32") {
+      expect(statSync(runtime.paths.speechDirectory).mode & 0o777).toBe(0o700);
+      expect(statSync(runtime.paths.cacheDirectory).mode & 0o777).toBe(0o700);
+      expect(statSync(runtime.paths.voiceDirectory).mode & 0o777).toBe(0o700);
+      expect(statSync(runtime.paths.outputDirectory).mode & 0o777).toBe(0o700);
+      expect(statSync(runtime.paths.uploadDirectory).mode & 0o777).toBe(0o700);
+    }
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

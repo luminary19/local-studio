@@ -53,9 +53,12 @@ test("normalizes a bounded reference and removes temporary plaintext", async () 
     expect(result.durationMs).toBe(10_000);
     expect(result.audio).toEqual(wave(10_000));
     expect(receivedFormat).toBe("wav");
-    expect(plaintextMode).toBe(0o600);
     expect(readdirSync(join(directory, "runtime", "speech", "uploads"))).toEqual([]);
-    expect(statSync(join(directory, "runtime", "speech", "uploads")).mode & 0o777).toBe(0o700);
+    // POSIX permission bits are not representable on Windows.
+    if (process.platform !== "win32") {
+      expect(plaintextMode).toBe(0o600);
+      expect(statSync(join(directory, "runtime", "speech", "uploads")).mode & 0o777).toBe(0o700);
+    }
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

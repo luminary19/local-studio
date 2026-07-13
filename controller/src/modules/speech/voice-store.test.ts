@@ -12,6 +12,20 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { VoiceProfileError, VoiceStore, VOICE_CONSENT_VERSION } from "./voice-store";
 
+// Windows cannot delete the still-open SQLite database inside the temp dir;
+// tolerate lock errors there like tests/controller/integration/fixtures.ts does.
+const WINDOWS_LOCK_CODES = new Set(["EBUSY", "EPERM", "ENOTEMPTY", "EACCES"]);
+
+const removeTemporaryDirectory = (dir: string): void => {
+  try {
+    rmSync(dir, { recursive: true, force: true });
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? "";
+    if (process.platform === "win32" && WINDOWS_LOCK_CODES.has(code)) return;
+    throw error;
+  }
+};
+
 const fixture = (): { directory: string; store: VoiceStore } => {
   const directory = mkdtempSync(join(tmpdir(), "local-studio-voice-"));
   return {
@@ -32,9 +46,12 @@ test("sweeps only owned orphan plaintext when the store starts", () => {
     new VoiceStore(join(directory, "controller.db"), directory);
 
     expect(readdirSync(temporary)).toEqual(["preserve.wav"]);
-    expect(statSync(temporary).mode & 0o777).toBe(0o700);
+    // POSIX permission bits are not representable on Windows.
+    if (process.platform !== "win32") {
+      expect(statSync(temporary).mode & 0o777).toBe(0o700);
+    }
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    removeTemporaryDirectory(directory);
   }
 });
 
@@ -59,7 +76,7 @@ test("stores only opaque metadata and encrypted voice bytes", async () => {
     expect(encrypted.includes(audio)).toBe(false);
     expect(readFileSync(join(vaultDirectory, "master.key"))).toHaveLength(32);
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    removeTemporaryDirectory(directory);
   }
 });
 
@@ -89,7 +106,7 @@ test("decrypts into a short-lived controller path and deletes profiles", async (
       code: "voice_not_found",
     });
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    removeTemporaryDirectory(directory);
   }
 });
 
@@ -125,6 +142,6 @@ test("rejects missing consent and authenticated ciphertext changes", async () =>
 
     await expect(store.withPlaintext(profile.id, async () => undefined)).rejects.toThrow();
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    removeTemporaryDirectory(directory);
   }
 });
